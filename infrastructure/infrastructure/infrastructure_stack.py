@@ -2,6 +2,7 @@ from aws_cdk import (
     Stack,
     Duration,
     CfnOutput,
+    RemovalPolicy,
     aws_ec2 as ec2,
     aws_ecs as ecs,
     aws_ecr as ecr,
@@ -10,6 +11,7 @@ from aws_cdk import (
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
     aws_iam as iam,
+    aws_dynamodb as dynamodb,
 )
 from constructs import Construct
 
@@ -69,6 +71,33 @@ class InfrastructureStack(Stack):
         )
 
         # -------------------------
+        # DynamoDB Incident Store
+        # -------------------------
+
+        self.incidents_table = dynamodb.Table(
+            self,
+            "AegisIncidentsTable",
+            table_name="AegisIncidents",
+            partition_key=dynamodb.Attribute(
+                name="incident_id",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            point_in_time_recovery=True,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        # Grant least privilege to ECS task role
+        self.incidents_table.grant(
+            task_definition.task_role,
+            "dynamodb:PutItem",
+            "dynamodb:GetItem",
+            "dynamodb:UpdateItem",
+            "dynamodb:Scan",
+            "dynamodb:Query",
+        )
+
+        # -------------------------
         # Container
         # -------------------------
 
@@ -89,6 +118,9 @@ class InfrastructureStack(Stack):
                 protocol=ecs.Protocol.TCP,
             )
         )
+
+        container.add_environment("DYNAMODB_TABLE_NAME", self.incidents_table.table_name)
+        container.add_environment("AWS_REGION", self.region)
 
         # -------------------------
         # ECS Fargate Service
@@ -384,4 +416,11 @@ class InfrastructureStack(Stack):
             "AegisRecoveryStateMachineArn",
             value=self.recovery_state_machine.state_machine_arn,
             export_name="AegisRecoveryStateMachineArn"
+        )
+
+        CfnOutput(
+            self,
+            "AegisIncidentsTableName",
+            value=self.incidents_table.table_name,
+            export_name="AegisIncidentsTableName",
         )

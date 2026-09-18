@@ -1,4 +1,8 @@
-from fastapi import FastAPI
+import os
+import time
+from datetime import datetime
+from typing import Optional
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from policy import RemediationPolicy
 from remediation import RemediationEngine
@@ -10,6 +14,8 @@ from recovery import RecoveryVerifier
 from audit import AuditLogger
 from controller import AegisController
 from workflow import StepFunctionsWorkflowManager
+from correlation import IncidentCorrelationEngine
+from chaos import ChaosTestManager
 
 app = FastAPI(
     title="AEGIS Autonomous Cloud Infrastructure",
@@ -25,7 +31,23 @@ incident_manager = IncidentManager()
 rca_engine = RCAEngine()
 ai_reasoning_engine = AIReasoningEngine()
 audit_logger = AuditLogger()
-aegis_controller = AegisController(policy=policy, workflow=workflow_manager)
+correlation_engine = IncidentCorrelationEngine(window_seconds=60)
+aegis_controller = AegisController(
+    policy=policy,
+    workflow=workflow_manager,
+    correlation_engine=correlation_engine,
+    incident_manager=incident_manager,
+)
+chaos_manager = ChaosTestManager(
+    policy=policy,
+    workflow=workflow_manager,
+    correlation_engine=correlation_engine,
+    incident_manager=incident_manager,
+    detector=detector,
+    remediation=remediation_engine,
+    recovery=recovery_verifier,
+    audit=audit_logger,
+)
 
 
 class MetricInput(BaseModel):
@@ -50,6 +72,109 @@ def get_policy():
 def get_workflow():
     return workflow_manager.get_status()
 
+
+@app.get("/correlation")
+def get_correlation():
+    """Expose multi-signal correlation configuration and pending signal status."""
+    return {
+        "correlation_window_seconds": correlation_engine.window_seconds,
+        "pending_signals": correlation_engine.get_pending_signals_count(),
+    }
+
+
+@app.post("/correlation-test")
+def correlation_test():
+    """
+    Simulate multiple anomalous signals (CPU 95% + Memory 90%)
+    and verify that IncidentCorrelationEngine groups them into ONE unified correlated incident.
+    Does NOT execute destructive ECS actions.
+    """
+    test_engine = IncidentCorrelationEngine(window_seconds=60)
+    now_iso = datetime.utcnow().isoformat()
+
+    s1 = {
+        "metric": "cpu",
+        "value": 95.0,
+        "threshold": 80.0,
+        "severity": "CRITICAL",
+        "detection_method": "STATIC_THRESHOLD",
+        "timestamp": now_iso,
+    }
+    s2 = {
+        "metric": "memory",
+        "value": 90.0,
+        "threshold": 80.0,
+        "severity": "CRITICAL",
+        "detection_method": "STATIC_THRESHOLD",
+        "timestamp": now_iso,
+    }
+
+    test_engine.add_signal(s1)
+    test_engine.add_signal(s2)
+
+    correlated = test_engine.correlate()
+
+    if correlated:
+        incident = incident_manager.create_correlated_incident(correlated)
+        audit_logger.log({
+            "event": "CORRELATED_INCIDENT",
+            "incident_id": incident.id,
+            "severity": incident.severity,
+            "signal_count": incident.signal_count or len(correlated.get("signals", [])),
+            "signals": [s["metric"] for s in correlated.get("signals", [])],
+            "reason": incident.reason or correlated.get("reason", "Multiple correlated infrastructure signals detected"),
+        })
+
+    return correlated
+
+
+# ----------------------------------------------------
+# Controlled Fault Injection & Chaos Demo Suite Routes
+# ----------------------------------------------------
+
+@app.get("/chaos")
+def get_chaos():
+    """Return available chaos test scenarios."""
+    return {
+        "available_tests": chaos_manager.get_available_tests()
+    }
+
+
+@app.post("/chaos/cpu-spike")
+def chaos_cpu_spike(dry_run: bool = Query(default=False)):
+    """Simulate a controlled CPU spike failure."""
+    return chaos_manager.run_cpu_spike(dry_run=dry_run)
+
+
+@app.post("/chaos/task-failure")
+def chaos_task_failure(dry_run: bool = Query(default=False)):
+    """Simulate a controlled ECS task crash/failure."""
+    return chaos_manager.run_task_failure(dry_run=dry_run)
+
+
+@app.post("/chaos/memory-pressure")
+def chaos_memory_pressure(dry_run: bool = Query(default=False)):
+    """Simulate a controlled container memory pressure anomaly."""
+    return chaos_manager.run_memory_pressure(dry_run=dry_run)
+
+
+@app.post("/chaos/multi-signal")
+def chaos_multi_signal(dry_run: bool = Query(default=False)):
+    """Simulate a controlled compound multi-signal failure."""
+    return chaos_manager.run_multi_signal(dry_run=dry_run)
+
+
+@app.get("/chaos/history")
+def get_chaos_history():
+    """Return recent chaos experiments."""
+    return {
+        "tests": chaos_manager.get_history()
+    }
+
+
+# ----------------------------------------------------
+# Core Detection, Incidents & Operations Routes
+# ----------------------------------------------------
 
 @app.post("/detect")
 def detect(metric: MetricInput):
@@ -105,7 +230,7 @@ def scan():
             incidents.append(incident)
 
     return {
-        "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+        "timestamp": datetime.utcnow().isoformat(),
         "metrics": results,
         "incidents": incidents,
     }
@@ -143,6 +268,14 @@ def get_incidents():
     return {
         "incidents": incident_manager.get_incidents()
     }
+
+
+@app.get("/incidents/{incident_id}")
+def get_incident(incident_id: str):
+    incident = incident_manager.get_by_id(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return incident
 
 
 @app.post("/rca")
@@ -198,28 +331,11 @@ def get_audit():
 @app.post("/verify-recovery")
 def verify_recovery(remediation: dict):
     target = remediation.get("target_desired_count") or remediation.get("desired_count")
-
-    if target is None:
-        return {
-            "verified": False,
-            "reason": "No target desired count provided."
-        }
-
-    result = recovery_verifier.verify(target)
-
-    return {
-        "verified": result["recovered"],
-        "recovery": result
-    }
+    return recovery_verifier.verify(target)
 
 
-@app.post("/autonomous-run")
-def autonomous_run():
-    return aegis_controller.run()
-
-
-@app.post("/workflow-test")
-def workflow_test(incident: dict = None):
+@app.post("/step-function-test")
+def step_function_test(incident: dict = None):
     if not incident:
         incident = {
             "id": "INC-WORKFLOW-TEST",
@@ -230,20 +346,18 @@ def workflow_test(incident: dict = None):
             "severity": "CRITICAL",
         }
 
-    # Fetch current ECS desired count
     ecs = remediation_engine.ecs
     service = ecs.describe_services(
         cluster=remediation_engine.cluster,
         services=[remediation_engine.service]
     )["services"][0]
-    current_desired = service["desiredCount"]
-    target_desired = current_desired + 1
+    desired = service["desiredCount"]
+    target_desired = desired + 1
 
-    # 1. Evaluate policy
     policy_decision = policy.evaluate(
         incident=incident,
         action="SCALE_OUT",
-        current_desired_count=current_desired
+        current_desired_count=desired
     )
 
     if not policy_decision["allowed"]:
@@ -269,7 +383,6 @@ def workflow_test(incident: dict = None):
             "workflow": None,
         }
 
-    # 2. Start Step Functions Execution
     exec_info = workflow_manager.start_recovery(
         incident=incident,
         action="SCALE_OUT",
@@ -278,13 +391,11 @@ def workflow_test(incident: dict = None):
 
     policy.record_action()
 
-    # 3. Wait/Poll for execution completion
     workflow_result = workflow_manager.wait_for_completion(
         exec_info["execution_arn"],
         timeout_seconds=120
     )
 
-    # 4. Audit
     audit_logger.log({
         "event": "STEP_FUNCTION_RECOVERY",
         "incident_id": incident.get("id"),
@@ -319,7 +430,6 @@ def task_failure_workflow_test(incident: dict = None):
             "severity": "CRITICAL",
         }
 
-    # Fetch current ECS desired count
     ecs = remediation_engine.ecs
     service = ecs.describe_services(
         cluster=remediation_engine.cluster,
@@ -328,7 +438,6 @@ def task_failure_workflow_test(incident: dict = None):
     desired = service["desiredCount"]
     target_desired = desired if desired > 0 else 1
 
-    # 1. Evaluate policy
     policy_decision = policy.evaluate(
         incident=incident,
         action="RESTART_TASKS",
@@ -358,7 +467,6 @@ def task_failure_workflow_test(incident: dict = None):
             "workflow": None,
         }
 
-    # 2. Start Step Functions Execution for RESTART_TASKS
     exec_info = workflow_manager.start_recovery(
         incident=incident,
         action="RESTART_TASKS",
@@ -367,13 +475,11 @@ def task_failure_workflow_test(incident: dict = None):
 
     policy.record_action()
 
-    # 3. Wait/Poll for execution completion
     workflow_result = workflow_manager.wait_for_completion(
         exec_info["execution_arn"],
         timeout_seconds=120
     )
 
-    # 4. Audit
     audit_logger.log({
         "event": "STEP_FUNCTION_RECOVERY",
         "incident_id": incident.get("id"),
@@ -412,8 +518,6 @@ def autonomous_test(incident: dict = None):
         incident,
         execute=True,
     )
-
-    import time
 
     target = remediation.get("target_desired_count")
     recovery = None
@@ -463,8 +567,6 @@ def task_failure_test(incident: dict = None):
         }
 
     remediation = remediation_engine.restart_tasks(incident, execute=True)
-
-    import time
 
     recovery = None
     desired = remediation.get("desired_count", 1)
@@ -536,7 +638,7 @@ def get_system_status():
     all_incidents = incident_manager.get_incidents()
     open_incidents = [
         i for i in all_incidents
-        if i.get("status") == "OPEN"
+        if (i.status if hasattr(i, "status") else i.get("status")) == "OPEN"
     ]
 
     audit_logs = audit_logger.get_logs()
@@ -545,7 +647,7 @@ def get_system_status():
     return {
         "system": "AEGIS Autonomous Cloud Infrastructure",
         "status": "OPERATIONAL",
-        "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+        "timestamp": datetime.utcnow().isoformat(),
 
         "ecs_service": {
             "cluster": remediation_engine.cluster,
@@ -564,6 +666,16 @@ def get_system_status():
         "incidents": {
             "total": len(all_incidents),
             "open": len(open_incidents),
+        },
+
+        "correlation": {
+            "window_seconds": correlation_engine.window_seconds,
+            "pending_signals": correlation_engine.get_pending_signals_count(),
+        },
+
+        "chaos_suite": {
+            "available_tests": chaos_manager.get_available_tests(),
+            "total_experiments_run": len(chaos_manager.get_history()),
         },
 
         "remediation_guardrails": policy.get_policy(),

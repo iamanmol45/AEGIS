@@ -1,22 +1,10 @@
-import time
-from controller import AegisController
-
-
-controller = AegisController()
+from supervisor import AegisSupervisor
 
 
 def run_loop():
-    print("AEGIS autonomous controller started")
-
-    while True:
-        try:
-            result = controller.run()
-            print("AEGIS cycle:", result)
-
-        except Exception as e:
-            print("AEGIS error:", str(e))
-
-        time.sleep(60)
+    """Compatibility wrapper that delegates to AegisSupervisor."""
+    supervisor = AegisSupervisor()
+    supervisor.start()
 
 
 if __name__ == "__main__":
