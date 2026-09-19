@@ -70,6 +70,38 @@ class InfrastructureStack(Stack):
             memory_limit_mib=512,
         )
 
+        task_definition.add_to_task_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ecs:DescribeServices",
+                    "ecs:UpdateService",
+                    "ecs:ListServices",
+                ],
+                resources=["*"],
+            )
+        )
+        task_definition.add_to_task_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "cloudwatch:GetMetricData",
+                    "cloudwatch:GetMetricStatistics",
+                    "cloudwatch:ListMetrics",
+                ],
+                resources=["*"],
+            )
+        )
+        task_definition.add_to_task_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:ListStateMachines",
+                    "states:DescribeStateMachine",
+                ],
+                resources=["*"],
+            )
+        )
+
         # -------------------------
         # DynamoDB Incident Store
         # -------------------------
