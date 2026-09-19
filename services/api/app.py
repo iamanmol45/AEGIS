@@ -201,11 +201,11 @@ def scan():
             dimensions=[
                 {
                     "Name": "ClusterName",
-                    "Value": "aegis-cluster",
+                    "Value": remediation_engine.cluster,
                 },
                 {
                     "Name": "ServiceName",
-                    "Value": "AegisInfrastructureStack-AegisApiServiceCEE6438E-NeHqjB9uxdtT",
+                    "Value": remediation_engine.service,
                 },
             ],
         )
@@ -347,11 +347,11 @@ def step_function_test(incident: dict = None):
         }
 
     ecs = remediation_engine.ecs
-    service = ecs.describe_services(
+    services = ecs.describe_services(
         cluster=remediation_engine.cluster,
         services=[remediation_engine.service]
-    )["services"][0]
-    desired = service["desiredCount"]
+    ).get("services", [])
+    desired = services[0]["desiredCount"] if services else 1
     target_desired = desired + 1
 
     policy_decision = policy.evaluate(
@@ -431,11 +431,11 @@ def task_failure_workflow_test(incident: dict = None):
         }
 
     ecs = remediation_engine.ecs
-    service = ecs.describe_services(
+    services = ecs.describe_services(
         cluster=remediation_engine.cluster,
         services=[remediation_engine.service]
-    )["services"][0]
-    desired = service["desiredCount"]
+    ).get("services", [])
+    desired = services[0]["desiredCount"] if services else 1
     target_desired = desired if desired > 0 else 1
 
     policy_decision = policy.evaluate(
@@ -600,40 +600,57 @@ def task_failure_test(incident: dict = None):
 
 @app.get("/status")
 def get_system_status():
-    ecs = remediation_engine.ecs
+    service_info = {
+        "cluster": remediation_engine.cluster,
+        "service": remediation_engine.service,
+        "desired_count": 0,
+        "running_count": 0,
+        "pending_count": 0,
+        "healthy": False,
+    }
 
-    service = ecs.describe_services(
-        cluster=remediation_engine.cluster,
-        services=[remediation_engine.service]
-    )["services"][0]
+    try:
+        ecs = remediation_engine.ecs
+        desc = ecs.describe_services(
+            cluster=remediation_engine.cluster,
+            services=[remediation_engine.service]
+        )
+        services = desc.get("services", [])
+        if services:
+            service = services[0]
+            desired = service.get("desiredCount", 0)
+            running = service.get("runningCount", 0)
+            pending = service.get("pendingCount", 0)
+            service_info.update({
+                "desired_count": desired,
+                "running_count": running,
+                "pending_count": pending,
+                "healthy": running == desired and pending == 0,
+            })
+    except Exception as e:
+        service_info["error"] = str(e)
 
-    desired = service["desiredCount"]
-    running = service["runningCount"]
-    pending = service["pendingCount"]
-
-    cpu = detector.get_latest_metric(
-        "CPUUtilization",
-        "AWS/ECS",
-        [
-            {"Name": "ClusterName", "Value": "aegis-cluster"},
-            {
-                "Name": "ServiceName",
-                "Value": "AegisInfrastructureStack-AegisApiServiceCEE6438E-NeHqjB9uxdtT"
-            },
-        ],
-    )
-
-    memory = detector.get_latest_metric(
-        "MemoryUtilization",
-        "AWS/ECS",
-        [
-            {"Name": "ClusterName", "Value": "aegis-cluster"},
-            {
-                "Name": "ServiceName",
-                "Value": "AegisInfrastructureStack-AegisApiServiceCEE6438E-NeHqjB9uxdtT"
-            },
-        ],
-    )
+    cpu = None
+    memory = None
+    try:
+        cpu = detector.get_latest_metric(
+            "CPUUtilization",
+            "AWS/ECS",
+            [
+                {"Name": "ClusterName", "Value": remediation_engine.cluster},
+                {"Name": "ServiceName", "Value": remediation_engine.service},
+            ],
+        )
+        memory = detector.get_latest_metric(
+            "MemoryUtilization",
+            "AWS/ECS",
+            [
+                {"Name": "ClusterName", "Value": remediation_engine.cluster},
+                {"Name": "ServiceName", "Value": remediation_engine.service},
+            ],
+        )
+    except Exception:
+        pass
 
     all_incidents = incident_manager.get_incidents()
     open_incidents = [
@@ -648,38 +665,24 @@ def get_system_status():
         "system": "AEGIS Autonomous Cloud Infrastructure",
         "status": "OPERATIONAL",
         "timestamp": datetime.utcnow().isoformat(),
-
-        "ecs_service": {
-            "cluster": remediation_engine.cluster,
-            "service": remediation_engine.service,
-            "desired_count": desired,
-            "running_count": running,
-            "pending_count": pending,
-            "healthy": running == desired and pending == 0,
-        },
-
+        "ecs_service": service_info,
         "metrics": {
             "cpu_utilization": round(cpu, 2) if cpu is not None else None,
             "memory_utilization": round(memory, 2) if memory is not None else None,
         },
-
         "incidents": {
             "total": len(all_incidents),
             "open": len(open_incidents),
         },
-
         "correlation": {
             "window_seconds": correlation_engine.window_seconds,
             "pending_signals": correlation_engine.get_pending_signals_count(),
         },
-
         "chaos_suite": {
             "available_tests": chaos_manager.get_available_tests(),
             "total_experiments_run": len(chaos_manager.get_history()),
         },
-
         "remediation_guardrails": policy.get_policy(),
         "workflow": workflow_manager.get_status(),
-
         "last_audit_event": last_event,
     }

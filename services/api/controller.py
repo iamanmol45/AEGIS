@@ -34,11 +34,16 @@ class AegisController:
         """
         # 1. Check ECS task health
         ecs = self.remediation.ecs
-        service = ecs.describe_services(
+
+        services = ecs.describe_services(
             cluster=self.remediation.cluster,
             services=[self.remediation.service]
-        )["services"][0]
+        ).get("services", [])
 
+        if not services:
+            return {"status": "NO_SERVICE", "message": "No ECS service found"}
+
+        service = services[0]
         desired = service["desiredCount"]
         running = service["runningCount"]
 
@@ -67,8 +72,14 @@ class AegisController:
                 metric_name=cloudwatch_metric,
                 namespace="AWS/ECS",
                 dimensions=[
-                    {"Name": "ClusterName", "Value": "aegis-cluster"},
-                    {"Name": "ServiceName", "Value": "AegisInfrastructureStack-AegisApiServiceCEE6438E-NeHqjB9uxdtT"},
+                    {
+                        "Name": "ClusterName",
+                        "Value": self.remediation.cluster,
+                    },
+                    {
+                        "Name": "ServiceName",
+                        "Value": self.remediation.service,
+                    },
                 ],
             )
 

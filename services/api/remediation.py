@@ -17,12 +17,24 @@ class RemediationEngine:
             "aegis-cluster"
         )
 
-        self.service = os.getenv(
-            "ECS_SERVICE",
-            "AegisInfrastructureStack-AegisApiServiceCEE6438E-NeHqjB9uxdtT"
-        )
-
+        self._service = os.getenv("ECS_SERVICE")
         self.policy = policy or RemediationPolicy()
+
+    @property
+    def service(self):
+        if self._service:
+            return self._service
+
+        try:
+            response = self.ecs.list_services(cluster=self.cluster)
+            arns = response.get("serviceArns", [])
+            if arns:
+                self._service = arns[0].split("/")[-1]
+                return self._service
+        except Exception as e:
+            print(f"Error discovering ECS service: {e}")
+
+        return "AegisInfrastructureStack-AegisApiServiceCEE6438E-3UL7oJqplNbq"
 
     @property
     def max_desired_count(self):
@@ -35,10 +47,12 @@ class RemediationEngine:
     def scale_out(self, incident, execute=True):
         now = datetime.utcnow()
 
-        current = self.ecs.describe_services(
+        services = self.ecs.describe_services(
             cluster=self.cluster,
             services=[self.service]
-        )["services"][0]["desiredCount"]
+        ).get("services", [])
+
+        current = services[0]["desiredCount"] if services else 1
 
         target = current + 1
         incident_id = incident.get("id") if hasattr(incident, "get") else incident["id"]
@@ -104,12 +118,12 @@ class RemediationEngine:
     def restart_tasks(self, incident, execute=True):
         now = datetime.utcnow()
 
-        service = self.ecs.describe_services(
+        services = self.ecs.describe_services(
             cluster=self.cluster,
             services=[self.service]
-        )["services"][0]
+        ).get("services", [])
 
-        desired = service["desiredCount"]
+        desired = services[0]["desiredCount"] if services else 1
         incident_id = incident.get("id") if hasattr(incident, "get") else incident["id"]
 
         if not execute:

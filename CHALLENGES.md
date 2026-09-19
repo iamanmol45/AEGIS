@@ -223,3 +223,35 @@ Running `cdk synth` from the repository root `BHARAT BUILDS/` or `BHARAT BUILDS/
 - Always run CDK CLI commands (`cdk synth`, `cdk diff`, `cdk deploy`) from the directory containing `cdk.json`.
 
 ---
+
+### [CHALLENGE-008] ECS Task Role AccessDenied & Stale Service Name on `/status` (500 Internal Server Error)
+
+- **Date / Stage**: 2026-09-19 | Production Deployment & Verification
+- **Component**: `services/api/app.py`, `services/api/remediation.py`, `infrastructure/infrastructure_stack.py`
+- **Severity**: High (500 Internal Server Error on `/status`)
+
+#### 1. Issue Description
+While `/health`, `/policy`, and `/workflow` responded successfully, testing `/status` returned an unhandled HTTP 500 Internal Server Error:
+```text
+curl.exe "$BASE/status"
+Internal Server Error
+```
+
+#### 2. Root Cause Analysis
+Inspecting the ECS container logs in CloudWatch revealed two cascading failures:
+1. **Missing Task Role IAM Permissions**:
+   The ECS Task Definition role was created without explicit policies for ECS and CloudWatch. Calling `ecs.describe_services()` raised `botocore.errorfactory.AccessDeniedException: ... is not authorized to perform: ecs:DescribeServices`.
+2. **Stale Hardcoded Service Name**:
+   The code had the ECS service name hardcoded to `AegisInfrastructureStack-AegisApiServiceCEE6438E-NeHqjB9uxdtT`, whereas the active ECS service in the cluster had regenerated to `...-3UL7oJqplNbq`. This would also cause an unhandled `IndexError` on `["services"][0]`.
+3. **No Defensive Fallback**:
+   `/status` lacked `try/except` guards around dynamic metric and cluster inspection calls.
+
+#### 3. Resolution & Fix
+1. Attached an inline IAM policy to the ECS Task Role granting `ecs:DescribeServices`, `ecs:UpdateService`, `ecs:ListServices`, `cloudwatch:GetMetric*`, and `states:*`. Updated [infrastructure_stack.py](file:///c:/Users/pranj/AEGIS/infrastructure/infrastructure/infrastructure_stack.py) so CDK retains these permissions.
+2. Implemented dynamic service discovery in [remediation.py](file:///c:/Users/pranj/AEGIS/services/api/remediation.py), [recovery.py](file:///c:/Users/pranj/AEGIS/services/api/recovery.py), and [controller.py](file:///c:/Users/pranj/AEGIS/services/api/controller.py) using `list_services()`.
+3. Added defensive error handling in [app.py](file:///c:/Users/pranj/AEGIS/services/api/app.py) `get_system_status()`.
+4. Built and pushed a new container image to ECR and triggered an ECS rolling update.
+
+#### 4. Key Takeaways
+- Container tasks communicating with AWS control planes require explicit IAM Task Role permissions.
+- Never hardcode CloudFormation resource suffixes that can drift across stack deployments; use dynamic resource discovery or environment variable injection.
