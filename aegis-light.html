@@ -1,0 +1,2445 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AEGIS — aegis-production dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --page: #F4F5F7;
+      --surface: #FFFFFF;
+      --tile: #FFFFFF;
+      --sunk: #F7F8FA;
+      --hover: #F2F4F7;
+      --line: #E1E4E9;
+      --hair: #EDEEF2;
+      --tx: #1B1D22;
+      --tx2: #5B6069;
+      --tx3: #8B9098;
+      --accent: #4C5FD5;
+      --accent2: #8A93E8;
+      --accentdim: #C7CCF0;
+      --accentwash: rgba(76, 95, 213, .07);
+      --ok: #1E8E5A;
+      --warn: #C08415;
+      --crit: #C8393F;
+      --info: #2F6FD0;
+      --teal: #17817E;
+      --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      margin: 0
+    }
+
+    body {
+      background: var(--page);
+      color: var(--tx);
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.45;
+      text-rendering: optimizeLegibility
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: none;
+      cursor: pointer
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px
+    }
+
+    ::selection {
+      background: rgba(76, 95, 213, .20)
+    }
+
+    .mono,
+    .num {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums
+    }
+
+    /* ── bar 1: breadcrumb ── */
+    .crumbbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 34px;
+      padding: 0 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--tx2)
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding-right: 12px;
+      margin-right: 2px;
+      border-right: 1px solid var(--line);
+      height: 100%
+    }
+
+    .logo svg {
+      width: 15px;
+      height: 15px
+    }
+
+    .logo b {
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: .02em
+    }
+
+    .crumbbar .sep {
+      color: #C3C7CE
+    }
+
+    .crumbbar .cur {
+      color: var(--tx)
+    }
+
+    .crumbbar .right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--tx3);
+      font-size: 11.5px
+    }
+
+    .who {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accentdim);
+      color: #3F4FBF;
+      font-size: 10px;
+      font-weight: 600;
+      display: grid;
+      place-items: center
+    }
+
+    /* ── bar 2: dashboard toolbar ── */
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap
+    }
+
+    .toolbar h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -.01em
+    }
+
+    .toolbar .meta {
+      color: var(--tx3);
+      font-size: 11.5px;
+      font-family: var(--mono)
+    }
+
+    .tools {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .ctl {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 26px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      background: var(--sunk);
+      color: var(--tx2);
+      font-size: 12px;
+      border-radius: 2px
+    }
+
+    .ctl:hover {
+      color: var(--tx);
+      border-color: #C3C7CE
+    }
+
+    .ctl.pri {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 500
+    }
+
+    .ctl.pri:hover {
+      background: #3F4FBF
+    }
+
+    select.ctl {
+      appearance: none;
+      padding-right: 22px;
+      background-image: linear-gradient(45deg, transparent 50%, #8B9098 50%), linear-gradient(135deg, #8B9098 50%, transparent 50%);
+      background-position: calc(100% - 12px) 11px, calc(100% - 8px) 11px;
+      background-size: 4px 4px;
+      background-repeat: no-repeat
+    }
+
+    .seg {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      overflow: hidden;
+      background: var(--sunk)
+    }
+
+    .seg button {
+      height: 24px;
+      padding: 0 9px;
+      font-size: 11.5px;
+      font-family: var(--mono);
+      color: var(--tx3)
+    }
+
+    .seg button+button {
+      border-left: 1px solid var(--line)
+    }
+
+    .seg button.on {
+      background: var(--hover);
+      color: var(--tx)
+    }
+
+    /* ── bar 3: section index ── */
+    .index {
+      position: sticky;
+      top: 47px;
+      z-index: 29;
+      display: flex;
+      gap: 2px;
+      padding: 0 10px;
+      background: var(--sunk);
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+      scrollbar-width: none
+    }
+
+    .index::-webkit-scrollbar {
+      display: none
+    }
+
+    .index a {
+      padding: 7px 9px;
+      font-size: 11.5px;
+      color: var(--tx3);
+      white-space: nowrap;
+      border-bottom: 2px solid transparent
+    }
+
+    .index a:hover {
+      color: var(--tx2)
+    }
+
+    .index a.on {
+      color: var(--tx);
+      border-bottom-color: var(--accent)
+    }
+
+    /* ── section bands ── */
+    .sec {
+      border-bottom: 1px solid var(--line);
+      scroll-margin-top: 78px
+    }
+
+    .sec-h {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      background: var(--surface);
+      cursor: pointer;
+      width: 100%;
+      text-align: left
+    }
+
+    .sec-h .chev {
+      width: 9px;
+      height: 9px;
+      border-right: 1.4px solid var(--tx3);
+      border-bottom: 1.4px solid var(--tx3);
+      transform: rotate(45deg);
+      margin: -3px 2px 0 0;
+      transition: transform .12s
+    }
+
+    .sec.closed .chev {
+      transform: rotate(-45deg)
+    }
+
+    .sec-h h2 {
+      margin: 0;
+      font-size: 13.5px;
+      font-weight: 600
+    }
+
+    .sec-h .note {
+      color: var(--tx3);
+      font-size: 11.5px
+    }
+
+    .sec-h .right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .sub {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 16px;
+      background: var(--sunk);
+      border-top: 1px solid var(--hair);
+      border-bottom: 1px solid var(--hair);
+      font-size: 11.5px;
+      color: var(--tx2)
+    }
+
+    .sub b {
+      font-weight: 500;
+      color: var(--tx)
+    }
+
+    .body {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border-top: 1px solid var(--line)
+    }
+
+    .sec.closed .body,
+    .sec.closed .sub {
+      display: none
+    }
+
+    /* ── widgets ── */
+    .w {
+      background: var(--tile);
+      padding: 11px 13px 13px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column
+    }
+
+    .w.s2 {
+      grid-column: span 2
+    }
+
+    .w.s3 {
+      grid-column: span 3
+    }
+
+    .w.s4 {
+      grid-column: span 4
+    }
+
+    .w.pad0 {
+      padding: 0
+    }
+
+    .w-h {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 1px
+    }
+
+    .w-h h3 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .005em
+    }
+
+    .w-h .dots {
+      margin-left: auto;
+      color: #B4B9C1;
+      letter-spacing: 1px;
+      font-size: 11px;
+      line-height: 1
+    }
+
+    .w-u {
+      font-size: 10.5px;
+      color: var(--tx3);
+      margin-bottom: 9px
+    }
+
+    .w-u.m {
+      margin-bottom: 6px
+    }
+
+    .legend {
+      display: flex;
+      gap: 11px;
+      flex-wrap: wrap;
+      margin-top: 8px
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10.5px;
+      color: var(--tx2)
+    }
+
+    .legend i {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+      display: inline-block
+    }
+
+    .legend i.ln {
+      height: 2px;
+      width: 10px;
+      border-radius: 1px
+    }
+
+    .foot {
+      margin-top: 8px;
+      font-size: 10.5px;
+      color: var(--tx3)
+    }
+
+    /* ── kpi widget ── */
+    .kv-big {
+      font-family: var(--mono);
+      font-size: 25px;
+      font-weight: 500;
+      letter-spacing: -.02em;
+      line-height: 1.1;
+      margin: 2px 0 2px
+    }
+
+    .kv-big s {
+      text-decoration: none;
+      font-size: 12px;
+      color: var(--tx3);
+      margin-left: 1px
+    }
+
+    .delta {
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 4px
+    }
+
+    .delta.up {
+      color: var(--ok)
+    }
+
+    .delta.dn {
+      color: var(--crit)
+    }
+
+    .delta.fl {
+      color: var(--tx3)
+    }
+
+    .spark {
+      margin-top: auto;
+      padding-top: 10px
+    }
+
+    /* ── status vocabulary ── */
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex: 0 0 7px;
+      display: inline-block
+    }
+
+    .dot.ok {
+      background: var(--ok)
+    }
+
+    .dot.warn {
+      background: var(--warn)
+    }
+
+    .dot.crit {
+      background: var(--crit)
+    }
+
+    .dot.info {
+      background: var(--info)
+    }
+
+    .dot.iris {
+      background: var(--accent)
+    }
+
+    .dot.idle {
+      background: #B4B9C1
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10.5px;
+      padding: 1px 6px;
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      color: var(--tx2);
+      white-space: nowrap
+    }
+
+    .tag.ok {
+      color: #1E7A50;
+      border-color: #BCE0CB;
+      background: rgba(30, 142, 90, .08)
+    }
+
+    .tag.warn {
+      color: #8A5D0B;
+      border-color: #E7D3A4;
+      background: rgba(192, 132, 21, .09)
+    }
+
+    .tag.crit {
+      color: #B3282F;
+      border-color: #EFC5C6;
+      background: rgba(200, 57, 63, .07)
+    }
+
+    .tag.iris {
+      color: #3F4FBF;
+      border-color: #CBD1F5;
+      background: var(--accentwash)
+    }
+
+    .tag.info {
+      color: #245FB0;
+      border-color: #C2D5F0;
+      background: rgba(47, 111, 208, .07)
+    }
+
+    .sev {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 2px;
+      border: 1px solid
+    }
+
+    .sev.p1 {
+      color: #B3282F;
+      border-color: #EFC5C6;
+      background: rgba(200, 57, 63, .07)
+    }
+
+    .sev.p2 {
+      color: #8A5D0B;
+      border-color: #E7D3A4;
+      background: rgba(192, 132, 21, .09)
+    }
+
+    .sev.p3 {
+      color: #245FB0;
+      border-color: #C2D5F0;
+      background: rgba(90, 138, 234, .08)
+    }
+
+    /* ── health widget ── */
+    .health {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 4px 0 12px
+    }
+
+    .health .ring {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px
+    }
+
+    .health b {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -.02em;
+      display: block;
+      line-height: 1.1
+    }
+
+    .health p {
+      margin: 2px 0 0;
+      color: var(--tx2);
+      font-size: 11.5px;
+      max-width: 42ch
+    }
+
+    .hsplit {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line)
+    }
+
+    .hsplit div {
+      background: var(--sunk);
+      padding: 8px 10px
+    }
+
+    .hsplit .n {
+      font-family: var(--mono);
+      font-size: 15px
+    }
+
+    .hsplit .l {
+      font-size: 10.5px;
+      color: var(--tx3)
+    }
+
+    /* ── tables ── */
+    table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 500;
+      color: var(--tx3);
+      padding: 7px 12px;
+      background: var(--sunk);
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap
+    }
+
+    tbody td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--hair);
+      font-size: 12px
+    }
+
+    tbody tr:hover td {
+      background: var(--hover)
+    }
+
+    tbody tr.sel td {
+      background: rgba(76, 95, 213, .07)
+    }
+
+    tbody tr.sel td:first-child {
+      box-shadow: inset 2px 0 0 var(--accent)
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none
+    }
+
+    td.r,
+    th.r {
+      text-align: right
+    }
+
+    .tw {
+      overflow: auto
+    }
+
+    .tw.h240 {
+      max-height: 240px
+    }
+
+    .tw.h200 {
+      max-height: 200px
+    }
+
+    .tw.h280 {
+      max-height: 280px
+    }
+
+    .wt {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 11px 13px 9px
+    }
+
+    .wt h3 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600
+    }
+
+    .wt .u {
+      font-size: 10.5px;
+      color: var(--tx3)
+    }
+
+    .wt .right {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .svc {
+      display: flex;
+      align-items: center;
+      gap: 7px
+    }
+
+    .mb {
+      height: 4px;
+      width: 46px;
+      background: #E9EBEF;
+      border-radius: 2px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle
+    }
+
+    .mb i {
+      display: block;
+      height: 100%
+    }
+
+    .mb i.ok {
+      background: var(--ok)
+    }
+
+    .mb i.warn {
+      background: var(--warn)
+    }
+
+    .mb i.crit {
+      background: var(--crit)
+    }
+
+    /* ── kv list ── */
+    .kv {
+      display: flex;
+      gap: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--hair);
+      font-size: 11.5px
+    }
+
+    .kv:last-child {
+      border-bottom: none
+    }
+
+    .kv .k {
+      color: var(--tx2)
+    }
+
+    .kv .v {
+      margin-left: auto;
+      text-align: right
+    }
+
+    .hr {
+      height: 1px;
+      background: var(--hair);
+      margin: 10px 0
+    }
+
+    /* ── steps ── */
+    .step {
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      gap: 10px;
+      padding-bottom: 12px;
+      position: relative
+    }
+
+    .step:last-child {
+      padding-bottom: 0
+    }
+
+    .step::before {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: 20px;
+      bottom: 0;
+      width: 1px;
+      background: var(--line)
+    }
+
+    .step:last-child::before {
+      display: none
+    }
+
+    .step .mk {
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      font-size: 9.5px;
+      color: var(--tx3);
+      background: var(--tile);
+      z-index: 1
+    }
+
+    .step.done .mk {
+      border-color: #BCE0CB;
+      color: #1E7A50;
+      background: rgba(30, 142, 90, .08)
+    }
+
+    .step.run .mk {
+      border-color: var(--accentdim);
+      color: #3F4FBF;
+      background: var(--accentwash)
+    }
+
+    .step .t {
+      font-size: 11.5px;
+      font-weight: 500
+    }
+
+    .step .d {
+      font-size: 11px;
+      color: var(--tx2);
+      margin-top: 1px
+    }
+
+    .step .m {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--tx3);
+      margin-top: 2px
+    }
+
+    /* ── logs ── */
+    .logs {
+      font-family: var(--mono);
+      font-size: 11px;
+      overflow: auto;
+      background: var(--sunk)
+    }
+
+    .logs.h280 {
+      max-height: 280px
+    }
+
+    .lg {
+      display: grid;
+      grid-template-columns: 62px 44px 108px minmax(0, 1fr);
+      gap: 10px;
+      padding: 4px 13px;
+      border-bottom: 1px solid var(--hair)
+    }
+
+    .lg:hover {
+      background: var(--hover)
+    }
+
+    .lg .ts {
+      color: var(--tx3)
+    }
+
+    .lg .lv.ERROR,
+    .lg .lv.FATAL {
+      color: #B3282F
+    }
+
+    .lg .lv.WARN {
+      color: #8A5D0B
+    }
+
+    .lg .lv.INFO {
+      color: #3A6491
+    }
+
+    .lg .src {
+      color: var(--tx2)
+    }
+
+    .lg .msg {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    /* ── misc ── */
+    .note-b {
+      border-left: 2px solid var(--accentdim);
+      background: var(--accentwash);
+      padding: 8px 11px;
+      font-size: 11.5px;
+      color: var(--tx2)
+    }
+
+    .note-b b {
+      color: var(--tx);
+      font-weight: 500
+    }
+
+    .alert {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--hair);
+      align-items: baseline
+    }
+
+    .alert:last-child {
+      border-bottom: none
+    }
+
+    .alert .t {
+      font-size: 11.5px;
+      font-weight: 500
+    }
+
+    .alert .m {
+      font-size: 11px;
+      color: var(--tx2);
+      margin-top: 1px
+    }
+
+    .alert .w2 {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--tx3);
+      white-space: nowrap
+    }
+
+    .meter {
+      height: 5px;
+      background: #E9EBEF;
+      border-radius: 3px;
+      overflow: hidden
+    }
+
+    .meter i {
+      display: block;
+      height: 100%;
+      background: var(--accent)
+    }
+
+    .gauge {
+      display: flex;
+      gap: 2px;
+      margin: 8px 0 5px
+    }
+
+    .gauge s {
+      flex: 1;
+      height: 6px;
+      background: #E9EBEF;
+      text-decoration: none;
+      border-radius: 1px
+    }
+
+    .gauge s.f {
+      background: var(--accent)
+    }
+
+    .gauge s.p {
+      background: var(--accentdim)
+    }
+
+    .chaos {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      background: var(--sunk);
+      border-radius: 2px;
+      width: 100%;
+      text-align: left
+    }
+
+    .chaos:hover {
+      border-color: #C3C7CE;
+      background: var(--hover)
+    }
+
+    .chaos:disabled {
+      opacity: .42;
+      cursor: not-allowed
+    }
+
+    .chaos b {
+      font-size: 11.5px;
+      font-weight: 500;
+      display: block
+    }
+
+    .chaos span {
+      font-size: 10.5px;
+      color: var(--tx3)
+    }
+
+    .chart {
+      width: 100%;
+      position: relative
+    }
+
+    .chart svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible
+    }
+
+    #tip {
+      position: fixed;
+      z-index: 80;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .08s;
+      background: #FFFFFF;
+      border: 1px solid #D3D7DE;
+      border-radius: 2px;
+      padding: 7px 9px;
+      font-size: 11px;
+      min-width: 124px;
+      box-shadow: 0 4px 14px rgba(16, 24, 40, .12)
+    }
+
+    #tip .tt {
+      color: var(--tx3);
+      font-family: var(--mono);
+      font-size: 10px;
+      margin-bottom: 4px
+    }
+
+    #tip .tr {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 2px;
+      color: var(--tx2)
+    }
+
+    #tip .tr b {
+      margin-left: auto;
+      color: var(--tx);
+      font-family: var(--mono);
+      font-weight: 500
+    }
+
+    @media (max-width:1280px) {
+      .body {
+        grid-template-columns: repeat(2, minmax(0, 1fr))
+      }
+
+      .w.s3,
+      .w.s4 {
+        grid-column: span 2
+      }
+    }
+
+    @media (max-width:720px) {
+      .body {
+        grid-template-columns: minmax(0, 1fr)
+      }
+
+      .w.s2,
+      .w.s3,
+      .w.s4 {
+        grid-column: span 1
+      }
+
+      .toolbar {
+        gap: 8px
+      }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      * {
+        transition: none !important
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="crumbbar">
+    <span class="logo">
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M10 1.6 3.2 4.3v5.3c0 3.5 2.7 6.8 6.8 8.6 4.1-1.8 6.8-5.1 6.8-8.6V4.3L10 1.6Z" stroke="#4C5FD5"
+          stroke-width="1.4" stroke-linejoin="round" />
+        <path d="M10 6.4v7M7 9.8h6" stroke="#4C5FD5" stroke-width="1.4" stroke-linecap="round" />
+      </svg>
+      <b>AEGIS</b>
+    </span>
+    <span>Dashboards</span><span class="sep">/</span>
+    <span class="cur">aegis-production</span>
+    <span class="right">
+      <span>Auto refresh 1m</span><span>Updated 12:44:08 IST</span><span class="who">RS</span>
+    </span>
+  </div>
+
+  <div class="toolbar">
+    <h1>aegis-production</h1>
+    <span class="meta">acme-prod-1 · ap-south-1</span>
+    <div class="tools">
+      <select class="ctl" id="svcFilter" aria-label="Filter by service">
+        <option>All services</option>
+        <option>payments-api</option>
+        <option>orders-svc</option>
+        <option>checkout-web</option>
+        <option>ledger-worker</option>
+      </select>
+      <div class="seg" id="rangeSeg" role="group" aria-label="Time range">
+        <button data-range="1h">1h</button><button data-range="3h">3h</button>
+        <button class="on" data-range="12h">12h</button><button data-range="1d">1d</button>
+        <button data-range="3d">3d</button><button data-range="1w">1w</button>
+      </div>
+      <select class="ctl" id="refreshSel" aria-label="Refresh interval">
+        <option>1m</option>
+        <option>10s</option>
+        <option>5m</option>
+        <option>Off</option>
+      </select>
+      <button class="ctl" id="refreshBtn" title="Refresh now">Refresh</button>
+      <button class="ctl">Actions</button>
+      <button class="ctl pri">Save</button>
+    </div>
+  </div>
+
+  <nav class="index" id="index" aria-label="Dashboard sections">
+    <a href="#s-overview" class="on">System overview</a>
+    <a href="#s-metrics">Application metrics</a>
+    <a href="#s-errors">Errors &amp; database</a>
+    <a href="#s-services">Service health</a>
+    <a href="#s-incidents">Incidents</a>
+    <a href="#s-rca">Root cause</a>
+    <a href="#s-safety">Safety &amp; policy</a>
+    <a href="#s-recovery">Recovery</a>
+    <a href="#s-chaos">Chaos</a>
+    <a href="#s-logs">Logs, audit &amp; system</a>
+  </nav>
+
+  <!-- ══ 1 · SYSTEM OVERVIEW ══ -->
+  <section class="sec" id="s-overview">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>System overview</h2>
+      <span class="note">Overall health and operating metrics</span>
+      <span class="right"><span class="tag warn">1 active P1</span></span>
+    </button>
+    <div class="body">
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Overall system health</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Aggregated from ECS service state, CloudWatch alarms and open incidents</div>
+        <div class="health">
+          <svg class="ring" viewBox="0 0 44 44" aria-hidden="true">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#E9EBEF" stroke-width="5" />
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#C08415" stroke-width="5" stroke-dasharray="100.5 113.1"
+              stroke-linecap="butt" transform="rotate(-90 22 22)" />
+          </svg>
+          <div><b>Warning</b>
+            <p>8 of 9 services healthy. payments-api is failing health checks while an autonomous recovery runs.</p>
+          </div>
+        </div>
+        <div class="hsplit">
+          <div>
+            <div class="n" style="color:#1E7A50">8</div>
+            <div class="l">Healthy</div>
+          </div>
+          <div>
+            <div class="n" style="color:#8A5D0B">1</div>
+            <div class="l">Warning</div>
+          </div>
+          <div>
+            <div class="n" style="color:#B3282F">1</div>
+            <div class="l">Critical</div>
+          </div>
+          <div>
+            <div class="n">3</div>
+            <div class="l">Open incidents</div>
+          </div>
+        </div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>MTTD</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Mean time to detect · seconds</div>
+        <div class="kv-big">42<s>s</s></div>
+        <div class="delta up">▼ 18 s vs previous week</div>
+        <div class="chart spark" data-chart="spkMttd"></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>MTTR</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Mean time to recovery · minutes</div>
+        <div class="kv-big">4<s>m</s> 11<s>s</s></div>
+        <div class="delta up">▼ 1 m 02 s vs previous week</div>
+        <div class="chart spark" data-chart="spkMttr"></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Recovery success rate</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Verified recoveries ÷ attempts</div>
+        <div class="kv-big">94.2<s>%</s></div>
+        <div class="delta fl">65 verified of 69 attempts</div>
+        <div class="chart spark" data-chart="spkSucc"></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>RCA accuracy</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Root causes confirmed on operator review</div>
+        <div class="kv-big">88.6<s>%</s></div>
+        <div class="delta dn">▲ 2.1 pts below last week</div>
+        <div class="chart spark" data-chart="spkRca"></div>
+      </div>
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Audit completeness</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Records with all 14 required fields</div>
+        <div class="kv-big">100<s>%</s></div>
+        <div class="delta fl">69 of 69 records complete</div>
+        <div class="chart spark" data-chart="spkAudit"></div>
+      </div>
+      <div class="w s4 pad0">
+        <div class="wt">
+          <h3>System status</h3><span class="u">AEGIS agent and integration telemetry</span>
+          <span class="right"><span class="tag warn">1 agent throttled</span></span>
+        </div>
+        <div class="tw h200">
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>State</th>
+                <th class="r">Queue</th>
+                <th class="r">Last cycle</th>
+                <th class="r">Heartbeat</th>
+              </tr>
+            </thead>
+            <tbody id="agentRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 2 · APPLICATION METRICS ══ -->
+  <section class="sec" id="s-metrics">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Application metrics</h2>
+      <span class="note">CloudWatch and ALB, 1-minute resolution</span>
+      <span class="right"><span class="note">GET /status</span></span>
+    </button>
+    <div class="sub"><b>Compute</b> · ECS task averages, acme-prod-1</div>
+    <div class="body">
+      <div class="w">
+        <div class="w-h">
+          <h3>CPU utilization</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Percent</div>
+        <div class="chart" data-chart="cpu"></div>
+        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>payments-api</span><span><i class="ln"
+              style="background:#17817E"></i>orders-svc</span><span><i class="ln"
+              style="background:#98A0AB"></i>checkout-web</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Memory utilization</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Percent of 2 GiB task limit</div>
+        <div class="chart" data-chart="mem"></div>
+        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>payments-api</span><span><i class="ln"
+              style="background:#17817E"></i>orders-svc</span><span><i class="ln"
+              style="background:#98A0AB"></i>checkout-web</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Request count</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Requests per minute · ALB</div>
+        <div class="chart" data-chart="req"></div>
+        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>This period</span><span><i class="ln"
+              style="background:#A9AFB8"></i>Previous period</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Response time</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Target response time · milliseconds</div>
+        <div class="chart" data-chart="lat"></div>
+        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>p99</span><span><i class="ln"
+              style="background:#17817E"></i>p95</span><span><i class="ln" style="background:#98A0AB"></i>p50</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 3 · ERRORS & DATABASE ══ -->
+  <section class="sec" id="s-errors">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Errors and database</h2>
+      <span class="note">HTTP error monitoring and RDS health</span>
+    </button>
+    <div class="body">
+      <div class="w s2">
+        <div class="w-h">
+          <h3>HTTP error monitoring</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Responses per minute, with error rate overlay</div>
+        <div class="chart" data-chart="err"></div>
+        <div class="legend"><span><i style="background:#C08415"></i>4xx</span><span><i
+              style="background:#C8393F"></i>5xx</span><span><i class="ln" style="background:#8A93E8"></i>Error rate
+            %</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Database health</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">aurora-pg-prod writer · percent</div>
+        <div class="chart" data-chart="db"></div>
+        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>CPU</span><span><i class="ln"
+              style="background:#17817E"></i>Connections of 400</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Database capacity</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Storage and connection headroom</div>
+        <div class="kv"><span class="k">CPU utilization</span><span class="v num">46%</span></div>
+        <div class="kv"><span class="k">Connections</span><span class="v num">312 / 400</span></div>
+        <div class="kv"><span class="k">Free storage</span><span class="v num">312 GiB / 500</span></div>
+        <div class="kv"><span class="k">Replica lag</span><span class="v num">84 ms</span></div>
+        <div class="kv"><span class="k">Deadlocks, 1 h</span><span class="v num">0</span></div>
+        <div class="hr"></div>
+        <div class="w-u m">Connection pool saturation</div>
+        <div class="meter"><i style="width:78%;background:#C08415"></i></div>
+        <div class="foot">78% saturated — alarm threshold is 85%.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 4 · SERVICE HEALTH ══ -->
+  <section class="sec" id="s-services">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Service health</h2>
+      <span class="note">ECS services and recent deployments</span>
+    </button>
+    <div class="body">
+      <div class="w s3 pad0">
+        <div class="wt">
+          <h3>Service health table</h3><span class="u">9 services · running and desired tasks</span>
+        </div>
+        <div class="tw h280">
+          <table>
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Tasks</th>
+                <th>CPU</th>
+                <th>Memory</th>
+                <th class="r">p95</th>
+                <th class="r">5xx</th>
+                <th>Revision</th>
+                <th>Health</th>
+              </tr>
+            </thead>
+            <tbody id="svcRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="w pad0">
+        <div class="wt">
+          <h3>Deployment events</h3><span class="u">Last 24 h</span>
+        </div>
+        <div class="tw h280">
+          <table>
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Revision</th>
+                <th>Time</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody id="depRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 5 · INCIDENTS ══ -->
+  <section class="sec" id="s-incidents">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Incidents</h2>
+      <span class="note">Detected anomalies, correlation and impact</span>
+      <span class="right"><span class="note">DynamoDB aegis-incidents</span></span>
+    </button>
+    <div class="body">
+      <div class="w s4 pad0">
+        <div class="wt">
+          <h3>Active incidents</h3><span class="u">Select a row to load details, correlation and evidence</span>
+          <span class="right"><select class="ctl">
+              <option>Open</option>
+              <option>All states</option>
+              <option>Resolved</option>
+            </select><select class="ctl">
+              <option>All severities</option>
+              <option>P1 only</option>
+            </select></span>
+        </div>
+        <div class="tw h240">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Service</th>
+                <th>Anomaly</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Detected</th>
+                <th>Duration</th>
+                <th>Owner</th>
+                <th class="r">Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="incRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="sub"><b>INC-2481</b> · payments-api · memory saturation with 5xx surge <span class="sev p1"
+        style="margin-left:6px">P1</span></div>
+    <div class="body">
+      <div class="w">
+        <div class="w-h">
+          <h3>Incident details</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">GET /incidents/INC-2481</div>
+        <div id="incDetail"></div>
+      </div>
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Incident correlation</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">6 related signals grouped into one incident · minutes from first anomaly</div>
+        <div class="chart" data-chart="corr"></div>
+        <div class="foot">Signals within a 90-second window on services sharing a dependency edge are merged by
+          correlation.py.</div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Notifications and alerts</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">SNS topic aegis-critical</div>
+        <div id="alertBody"></div>
+      </div>
+      <div class="w s3">
+        <div class="w-h">
+          <h3>Dependency graph</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Service call paths · requests per minute and error rate on each edge</div>
+        <div class="chart" data-chart="dep"></div>
+        <div class="legend"><span><i style="background:#C8393F"></i>Failing</span><span><i
+              style="background:#C08415"></i>Degraded</span><span><i style="background:#1E8E5A"></i>Healthy</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Human escalation</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Incidents awaiting an operator</div>
+        <div id="escBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 6 · ROOT CAUSE ══ -->
+  <section class="sec" id="s-rca">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Root cause analysis</h2>
+      <span class="note">rca.py and ai_reasoning.py for INC-2481</span>
+      <span class="right"><button class="ctl">Re-run</button></span>
+    </button>
+    <div class="body">
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Probable root cause</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Candidates ranked by weighted evidence score</div>
+        <div class="note-b" style="margin-bottom:11px"><b>Memory leak introduced by payments-api v2.14.3.</b> Heap grows
+          41 MiB/hour with no reclamation after GC. Tasks reach the 2 GiB limit around 3.5 hours after each deploy and
+          are OOM-killed, producing 502s at the load balancer.</div>
+        <div class="chart" data-chart="rcaRank"></div>
+        <div class="foot">Score = metric correlation (0.5) + log signature match (0.3) + change proximity (0.2).</div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Confidence score</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">RCA confidence · POST /reason</div>
+        <div class="kv-big" style="color:#3F4FBF">91<s>%</s></div>
+        <div class="gauge" id="gauge"></div>
+        <div class="delta fl">Above the 85% autonomous-action threshold</div>
+        <div class="hr"></div>
+        <div class="kv"><span class="k">Metric correlation</span><span class="v num">0.94</span></div>
+        <div class="kv"><span class="k">Log signature match</span><span class="v num">0.89</span></div>
+        <div class="kv"><span class="k">Change proximity</span><span class="v num">0.86</span></div>
+        <div class="kv"><span class="k">Historical precedent</span><span class="v num">4 matches</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Evidence</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Metrics, logs, events and changes attached to the incident</div>
+        <div class="kv"><span class="k">Log signature</span><span class="v mono"
+            style="font-size:10.5px">OutOfMemoryError ×47</span></div>
+        <div class="kv"><span class="k">Change event</span><span class="v mono" style="font-size:10.5px">deploy v2.14.3
+            · 08:12</span></div>
+        <div class="kv"><span class="k">Trace exemplars</span><span class="v">12 spans &gt; 4 s</span></div>
+        <div class="kv"><span class="k">Metric artefacts</span><span class="v num">6</span></div>
+        <div class="kv"><span class="k">Ruled out</span><span class="v">RDS, upstream 429s</span></div>
+        <div class="hr"></div>
+        <div class="w-u m">Heap after GC · MiB per task</div>
+        <div class="chart" data-chart="heap"></div>
+      </div>
+      <div class="w s2">
+        <div class="w-h">
+          <h3>AI reasoning</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Explanation and diagnosis recorded verbatim in the audit log</div>
+        <div id="reasonSteps"></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>OOM kills and restarts</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Count per hour · payments-api</div>
+        <div class="chart" data-chart="oom"></div>
+        <div class="foot">Kills begin 3 h 40 m after the v2.14.3 rollout completed.</div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Reasoning run</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">POST /reason · ai_reasoning.py</div>
+        <div class="kv"><span class="k">Run ID</span><span class="v mono">rsn-8841</span></div>
+        <div class="kv"><span class="k">Evidence tokens</span><span class="v num">18,402</span></div>
+        <div class="kv"><span class="k">Latency</span><span class="v num">6.4 s</span></div>
+        <div class="kv"><span class="k">Candidates weighed</span><span class="v num">5</span></div>
+        <div class="kv"><span class="k">Diagnosis</span><span class="v">Rollback recommended</span></div>
+        <div class="hr"></div>
+        <div class="note-b">Operator review is open. Accepting or disputing this diagnosis updates RCA accuracy.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 7 · SAFETY & POLICY ══ -->
+  <section class="sec" id="s-safety">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Safety and policy</h2>
+      <span class="note">policy.py evaluation before any remediation</span>
+      <span class="right"><span class="tag warn">Human review required</span></span>
+    </button>
+    <div class="body">
+      <div class="w">
+        <div class="w-h">
+          <h3>Safety evaluation</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">GET /policy · risk, blast radius, policy</div>
+        <div class="kv"><span class="k">Risk score</span><span class="v"><span class="tag warn">Medium ·
+              0.46</span></span></div>
+        <div class="kv"><span class="k">Blast radius</span><span class="v">3 of 9 services</span></div>
+        <div class="kv"><span class="k">Traffic affected</span><span class="v num">18.4%</span></div>
+        <div class="kv"><span class="k">Reversible</span><span class="v">Yes · 90 s</span></div>
+        <div class="kv"><span class="k">Change freeze</span><span class="v">Not active</span></div>
+        <div class="kv"><span class="k">Policy version</span><span class="v mono"
+            style="font-size:10.5px">2026-09-04.2</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Blast radius by service</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Share of each service affected by the proposed action</div>
+        <div class="chart" data-chart="blast"></div>
+        <div class="foot">Six remaining services have no call path to the target.</div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Decision status</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">/policy → /remediate</div>
+        <div style="display:flex;align-items:center;gap:9px;margin:6px 0 9px"><span class="dot warn"
+            style="width:10px;height:10px;flex-basis:10px"></span><b style="font-size:17px;font-weight:600">Human
+            review</b></div>
+        <div class="kv"><span class="k">Verdict</span><span class="v">Allowed with approval</span></div>
+        <div class="kv"><span class="k">Rule triggered</span><span class="v mono"
+            style="font-size:10.5px">tier0-rollback-gate</span></div>
+        <div class="kv"><span class="k">Confidence gate</span><span class="v">91% ≥ 85% ✓</span></div>
+        <div class="kv"><span class="k">Rate limit</span><span class="v num">2 of 5 this hour</span></div>
+        <div class="kv"><span class="k">Requested</span><span class="v num">12:09:02</span></div>
+        <div class="hr"></div>
+        <div style="display:flex;gap:7px"><button class="ctl pri">Approve</button><button class="ctl">Block</button>
+        </div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Policy status</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Active safety limits · policy set prod-strict</div>
+        <div class="kv"><span class="k">Autonomy level</span><span class="v">Guarded</span></div>
+        <div class="kv"><span class="k">Max blast radius</span><span class="v num">25% of traffic</span></div>
+        <div class="kv"><span class="k">Action rate limit</span><span class="v num">5 per hour</span></div>
+        <div class="kv"><span class="k">Confidence threshold</span><span class="v num">85%</span></div>
+        <div class="kv"><span class="k">Tier-0 services</span><span class="v">payments-api, auth-svc</span></div>
+        <div class="kv"><span class="k">Rollback window</span><span class="v num">4 revisions</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 8 · RECOVERY ══ -->
+  <section class="sec" id="s-recovery">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Recovery</h2>
+      <span class="note">Proposed action through to verified outcome</span>
+      <span class="right"><span class="note">Step Functions aegis-recovery</span></span>
+    </button>
+    <div class="body">
+      <div class="w">
+        <div class="w-h">
+          <h3>Proposed recovery action</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">POST /remediate · remediation.py</div>
+        <div class="note-b" style="margin:4px 0 10px"><b>Roll back payments-api to v2.14.2</b>, then scale from 6 to 8
+          tasks for 30 minutes to absorb the retry backlog.</div>
+        <div class="kv"><span class="k">Action type</span><span class="v">Rollback + scale</span></div>
+        <div class="kv"><span class="k">Alternatives</span><span class="v">Restart, raise memory limit</span></div>
+        <div class="kv"><span class="k">Estimated recovery</span><span class="v num">3 m 40 s</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Recovery execution status</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">/workflow · execution aegis-recover-2481</div>
+        <div style="display:flex;align-items:center;gap:9px;margin:6px 0 9px"><span class="dot warn"
+            style="width:10px;height:10px;flex-basis:10px"></span><b style="font-size:17px;font-weight:600">Running</b>
+        </div>
+        <div class="kv"><span class="k">Step</span><span class="v num">4 of 6</span></div>
+        <div class="kv"><span class="k">Started</span><span class="v num">12:09:11</span></div>
+        <div class="kv"><span class="k">Elapsed</span><span class="v num">2 m 48 s</span></div>
+        <div class="kv"><span class="k">Retries</span><span class="v num">0</span></div>
+        <div class="kv"><span class="k">Pending / completed / failed</span><span class="v num">2 / 4 / 0</span></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Execution progress</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Current operation · seconds per step</div>
+        <div class="meter" style="margin:4px 0 6px"><i style="width:62%"></i></div>
+        <div class="foot" style="margin:0 0 10px">Rolling deployment: 5 of 8 tasks now on v2.14.2.</div>
+        <div class="chart" data-chart="steps"></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Recovery verification</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">POST /verify-recovery · target health after remediation</div>
+        <div class="kv"><span class="k">Healthy tasks</span><span class="v num">8 / 8 <span class="tag ok"
+              style="margin-left:5px">Met</span></span></div>
+        <div class="kv"><span class="k">CPU</span><span class="v num">34% <span style="color:var(--tx3)">base
+              31%</span></span></div>
+        <div class="kv"><span class="k">p95 latency</span><span class="v num">212 ms <span style="color:var(--tx3)">base
+              198</span></span></div>
+        <div class="kv"><span class="k">5xx rate</span><span class="v num">0.04% <span style="color:var(--tx3)">SLO
+              0.5%</span></span></div>
+        <div class="kv"><span class="k">Sample window</span><span class="v num">5 min</span></div>
+        <div class="hr"></div>
+        <div class="foot">Verification passes when all four targets hold for the full window.</div>
+      </div>
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Autonomous recovery workflow</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Detection → RCA → safety → recovery → verification</div>
+        <div id="wfSteps"></div>
+      </div>
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Before and after recovery</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">15 minutes before remediation against 15 minutes after verification</div>
+        <div class="chart" data-chart="ba"></div>
+        <div class="legend"><span><i style="background:#98A0AB"></i>Before</span><span><i
+              style="background:#4C5FD5"></i>After</span></div>
+      </div>
+      <div class="w s3 pad0">
+        <div class="wt">
+          <h3>Recovery history</h3><span class="u">Restart, scale and rollback actions · last 7 days</span>
+        </div>
+        <div class="tw h240">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Incident</th>
+                <th>Service</th>
+                <th>Action</th>
+                <th>Decided by</th>
+                <th class="r">Duration</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="recRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Recovery outcomes</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">69 attempts · last 7 days</div>
+        <div class="chart" data-chart="outcome"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 9 · CHAOS ══ -->
+  <section class="sec" id="s-chaos">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Chaos engineering</h2>
+      <span class="note">Fault injection against ECS · chaos.py</span>
+      <span class="right"><span class="tag ok">Safeguards active</span></span>
+    </button>
+    <div class="body">
+      <div class="w">
+        <div class="w-h">
+          <h3>Chaos control panel</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">/chaos/* · target and duration apply to all experiments</div>
+        <div style="display:flex;gap:7px;margin-bottom:10px">
+          <select class="ctl" style="flex:1">
+            <option>payments-api</option>
+            <option>orders-svc</option>
+            <option>checkout-web</option>
+            <option>ledger-worker</option>
+          </select>
+          <select class="ctl">
+            <option>2 min</option>
+            <option>5 min</option>
+            <option>10 min</option>
+          </select>
+        </div>
+        <div style="display:grid;gap:6px">
+          <button class="chaos" disabled><span><b>CPU spike</b><span>Pin 2 vCPU to 95% on one task</span></span><span
+              class="tag">Blocked</span></button>
+          <button class="chaos" disabled><span><b>Memory pressure</b><span>Allocate 1.6 GiB of the 2 GiB
+                limit</span></span><span class="tag">Blocked</span></button>
+          <button class="chaos" disabled><span><b>Task failure</b><span>Terminate one task without
+                draining</span></span><span class="tag">Blocked</span></button>
+        </div>
+        <div class="foot">Injection is blocked on payments-api while a P1 incident is open. Choose another target to
+          enable.</div>
+      </div>
+      <div class="w s3 pad0">
+        <div class="wt">
+          <h3>Chaos history</h3><span class="u">GET /chaos/history · previous experiments</span>
+          <span class="right"><span class="note" style="font-size:11px;color:var(--tx3)">18 runs this
+              month</span></span>
+        </div>
+        <div class="tw h240">
+          <table>
+            <thead>
+              <tr>
+                <th>Started</th>
+                <th>Experiment</th>
+                <th>Target</th>
+                <th>Duration</th>
+                <th class="r">Detected in</th>
+                <th class="r">Recovered in</th>
+                <th>Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="chaosRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 10 · LOGS, AUDIT & SYSTEM ══ -->
+  <section class="sec" id="s-logs">
+    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
+      <h2>Logs, audit and workflow</h2>
+      <span class="note">CloudWatch Logs, audit.log and Step Functions state</span>
+    </button>
+    <div class="body">
+      <div class="w s2 pad0">
+        <div class="wt">
+          <h3>Application logs</h3><span class="u">Exceptions and errors with timestamps</span>
+          <span class="right"><span class="seg" id="logSeg"><button class="on" data-lv="all">All</button><button
+                data-lv="ERROR">Errors</button><button data-lv="WARN">Warnings</button></span></span>
+        </div>
+        <div class="logs h280" id="logBody"></div>
+      </div>
+      <div class="w s2 pad0">
+        <div class="wt">
+          <h3>Audit trail</h3><span class="u">Incident → root cause → action → result</span>
+          <span class="right"><span class="tag ok">14/14 fields</span></span>
+        </div>
+        <div class="tw h280">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Incident</th>
+                <th>Root cause</th>
+                <th>Action</th>
+                <th>Decided by</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="auditRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Workflow status</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">GET /workflow · Step Functions integration state</div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px">
+          <div>
+            <div class="kv"><span class="k">Integration</span><span class="v"><span
+                  class="tag ok">Connected</span></span></div>
+            <div class="kv"><span class="k">State machine</span><span class="v mono"
+                style="font-size:10.5px">aegis-recovery v4</span></div>
+            <div class="kv"><span class="k">Median duration</span><span class="v num">3 m 52 s</span></div>
+            <div class="kv"><span class="k">Throttles, 24 h</span><span class="v num">0</span></div>
+          </div>
+          <div>
+            <div class="w-u m">Executions by state, last 24 h</div>
+            <div class="chart" data-chart="wf"></div>
+          </div>
+        </div>
+      </div>
+      <div class="w s2">
+        <div class="w-h">
+          <h3>Supervisor loop duration</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">Milliseconds per detection cycle · budget 500 ms</div>
+        <div class="chart" data-chart="loop"></div>
+        <div class="foot">The rise at 12:04 is the detection cycle that opened INC-2481.</div>
+      </div>
+    </div>
+  </section>
+
+  <div id="tip" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      "use strict";
+      var C = {
+        iris: "#4C5FD5", iris2: "#8A93E8", teal: "#17817E", grey: "#98A0AB", ok: "#1E8E5A", warn: "#C08415", crit: "#C8393F", info: "#2F6FD0",
+        line: "#E1E4E9", hair: "#EDEEF2", tx3: "#8B9098", tx2: "#5B6069"
+      };
+      var tip = document.getElementById("tip");
+      function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+      /* ── data ── */
+      function rng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+      function series(n, o) {
+        var r = rng(o.seed || 7), out = [], v = o.base, i, y;
+        for (i = 0; i < n; i++) { v += (o.base - v) * 0.18 + (r() - 0.5) * o.noise; y = v; if (o.event) y = o.event(i / (n - 1), y); out.push(Math.max(0, y)); }
+        return out;
+      }
+      var S = 0.60, P = 0.80, E = 0.90;
+      function ramp(t, a, b) { return t < a ? 0 : t > b ? 1 : (t - a) / (b - a); }
+      function bump(t, a, p, e, h) { if (t < a || t > e) return 0; return t < p ? h * ramp(t, a, p) : h * (1 - ramp(t, p, e)); }
+      var RANGES = { "1h": { n: 60, step: 1 }, "3h": { n: 72, step: 2.5 }, "12h": { n: 72, step: 10 }, "1d": { n: 96, step: 15 }, "3d": { n: 72, step: 60 }, "1w": { n: 84, step: 120 } };
+      var range = "12h";
+      function N() { return RANGES[range].n; }
+      function labels() {
+        var R = RANGES[range], o = [], end = new Date(2026, 8, 19, 12, 44, 0), i, d;
+        for (i = R.n - 1; i >= 0; i--) {
+          d = new Date(end.getTime() - i * R.step * 60000);
+          o.push(R.step >= 60 ? (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] + " " + String(d.getHours()).padStart(2, "0") + ":00")
+            : (String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")));
+        }
+        return o;
+      }
+
+      /* ── engine ── */
+      function nice(v) { var p = Math.pow(10, Math.floor(Math.log10(v || 1))), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; }
+      function pth(p) { return p.map(function (q, i) { return (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1); }).join(" "); }
+
+      function lineChart(node, cfg) {
+        var W = Math.max(node.clientWidth || 400, 200), H = cfg.height || 146;
+        var pl = cfg.padLeft === undefined ? 34 : cfg.padLeft, pr = 8, pt = 8, pb = cfg.labels ? 20 : 6;
+        var n = cfg.series[0].data.length, pw = W - pl - pr, ph = H - pt - pb;
+        var max = cfg.max !== undefined ? cfg.max : nice(Math.max.apply(null, cfg.series.map(function (s) { return Math.max.apply(null, s.data); })) * 1.12);
+        var min = cfg.min || 0, i, k;
+        var x = function (i) { return pl + (n < 2 ? pw / 2 : pw * i / (n - 1)); }, y = function (v) { return pt + ph - (v - min) / (max - min) * ph; };
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(cfg.aria || "time series") + '">';
+        var tk = cfg.ticks || 4;
+        for (k = 0; k <= tk; k++) {
+          var tv = min + (max - min) * k / tk, ty = y(tv);
+          svg += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + ty.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="' + (k === 0 ? C.line : C.hair) + '"/>';
+          svg += '<text x="' + (pl - 6) + '" y="' + (ty + 3.4).toFixed(1) + '" text-anchor="end" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">' + (cfg.fmtY ? cfg.fmtY(tv) : Math.round(tv)) + '</text>';
+        }
+        if (cfg.threshold !== undefined) svg += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(cfg.threshold) + '" y2="' + y(cfg.threshold) + '" stroke="' + C.warn + '" stroke-dasharray="3 3" opacity=".65"/>';
+        if (cfg.mark) {
+          var a = x(Math.floor(n * cfg.mark[0])), b = x(Math.floor(n * cfg.mark[1]));
+          svg += '<rect x="' + a + '" y="' + pt + '" width="' + (b - a) + '" height="' + ph + '" fill="rgba(200,57,63,.055)"/><line x1="' + a + '" x2="' + a + '" y1="' + pt + '" y2="' + (pt + ph) + '" stroke="' + C.crit + '" opacity=".45"/>';
+        }
+        cfg.series.forEach(function (s) {
+          var pts = s.data.map(function (v, i) { return [x(i), y(v)]; });
+          if (s.fill) svg += '<path d="' + pth(pts) + ' L ' + x(n - 1) + ' ' + (pt + ph) + ' L ' + pl + ' ' + (pt + ph) + ' Z" fill="' + s.color + '" opacity=".10"/>';
+          svg += '<path d="' + pth(pts) + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.w || 1.4) + '" stroke-linejoin="round"' + (s.dash ? ' stroke-dasharray="3 3" opacity=".75"' : '') + '/>';
+        });
+        if (cfg.labels) {
+          var ev = Math.ceil(n / (W > 440 ? 6 : 3));
+          for (i = 0; i < n; i += ev)svg += '<text x="' + x(i) + '" y="' + (H - 5) + '" text-anchor="middle" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">' + esc(cfg.labels[i]) + '</text>';
+        }
+        svg += '<g class="hv" opacity="0"><line y1="' + pt + '" y2="' + (pt + ph) + '" stroke="' + C.tx3 + '"/>';
+        cfg.series.forEach(function (s) { svg += '<circle r="2.8" fill="#FFFFFF" stroke="' + s.color + '" stroke-width="1.5"/>'; });
+        svg += '</g><rect class="hit" x="' + pl + '" y="' + pt + '" width="' + pw + '" height="' + ph + '" fill="transparent"/></svg>';
+        node.innerHTML = svg;
+        hover(node, cfg, n, x, y, pl, pw);
+      }
+      function hover(node, cfg, n, x, y, pl, pw) {
+        var svg = node.querySelector("svg"), hv = node.querySelector(".hv"), hit = node.querySelector(".hit");
+        if (!hit) return;
+        var ln = hv.querySelector("line"), dots = hv.querySelectorAll("circle");
+        hit.addEventListener("mousemove", function (e) {
+          var r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) / r.width * svg.viewBox.baseVal.width;
+          var i = Math.max(0, Math.min(n - 1, Math.round((sx - pl) / pw * (n - 1))));
+          hv.setAttribute("opacity", "1"); ln.setAttribute("x1", x(i)); ln.setAttribute("x2", x(i));
+          var h = '<div class="tt">' + esc(cfg.labels ? cfg.labels[i] : "") + '</div>';
+          cfg.series.forEach(function (s, si) {
+            if (dots[si]) { dots[si].setAttribute("cx", x(i)); dots[si].setAttribute("cy", y(s.data[i])); }
+            h += '<div class="tr"><i class="dot" style="background:' + s.color + '"></i>' + esc(s.name) + '<b>' + (cfg.fmtV ? cfg.fmtV(s.data[i]) : s.data[i].toFixed(1)) + '</b></div>';
+          });
+          tip.innerHTML = h; tip.style.opacity = "1";
+          tip.style.left = Math.min(window.innerWidth - 165, e.clientX + 14) + "px"; tip.style.top = (e.clientY - 10) + "px";
+        });
+        hit.addEventListener("mouseleave", function () { hv.setAttribute("opacity", "0"); tip.style.opacity = "0"; });
+      }
+      function barChart(node, cfg) {
+        var W = Math.max(node.clientWidth || 360, 200), H = cfg.height || 146;
+        var pl = cfg.padLeft === undefined ? 30 : cfg.padLeft, pr = 8, pt = 8, pb = cfg.cats ? 20 : 6;
+        var n = cfg.series[0].data.length, pw = W - pl - pr, ph = H - pt - pb, i, k;
+        var tot = cfg.series[0].data.map(function (_, i) { return cfg.stack ? cfg.series.reduce(function (a, s) { return a + s.data[i]; }, 0) : Math.max.apply(null, cfg.series.map(function (s) { return s.data[i]; })); });
+        var max = nice(Math.max.apply(null, tot) * 1.15);
+        var slot = pw / n, bw = cfg.stack ? Math.min(slot * 0.6, 20) : Math.min(slot * 0.7 / cfg.series.length, 16);
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(cfg.aria || "bar chart") + '">';
+        for (k = 0; k <= 3; k++) {
+          var ty = pt + ph - ph * k / 3;
+          svg += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + ty + '" y2="' + ty + '" stroke="' + (k === 0 ? C.line : C.hair) + '"/>';
+          svg += '<text x="' + (pl - 6) + '" y="' + (ty + 3.4) + '" text-anchor="end" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">' + (cfg.fmtY ? cfg.fmtY(max * k / 3) : Math.round(max * k / 3)) + '</text>';
+        }
+        for (i = 0; i < n; i++) {
+          var cx = pl + slot * i + slot / 2, acc = 0;
+          cfg.series.forEach(function (s, si) {
+            var v = s.data[i], h = v / max * ph;
+            var bx = cfg.stack ? cx - bw / 2 : cx - (bw * cfg.series.length) / 2 + si * bw;
+            var by = cfg.stack ? (pt + ph - acc - h) : (pt + ph - h);
+            svg += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + (cfg.stack ? bw : bw - 2).toFixed(1) + '" height="' + Math.max(h, .8).toFixed(1) + '" fill="' + s.color + '"/>'; acc += h;
+          });
+        }
+        if (cfg.line) {
+          var lm = cfg.line.max || nice(Math.max.apply(null, cfg.line.data) * 1.3);
+          svg += '<path d="' + pth(cfg.line.data.map(function (v, i) { return [pl + slot * i + slot / 2, pt + ph - v / lm * ph]; })) + '" fill="none" stroke="' + cfg.line.color + '" stroke-width="1.4"/>';
+        }
+        if (cfg.cats) {
+          var ev = Math.ceil(n / (W > 420 ? 7 : 4));
+          for (i = 0; i < n; i += ev)svg += '<text x="' + (pl + slot * i + slot / 2) + '" y="' + (H - 5) + '" text-anchor="middle" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">' + esc(cfg.cats[i]) + '</text>';
+        }
+        svg += '<g class="hv" opacity="0"><line y1="' + pt + '" y2="' + (pt + ph) + '" stroke="' + C.tx3 + '" opacity=".5"/>';
+        cfg.series.forEach(function () { svg += '<circle r="0"/>'; });
+        svg += '</g><rect class="hit" x="' + pl + '" y="' + pt + '" width="' + pw + '" height="' + ph + '" fill="transparent"/></svg>';
+        node.innerHTML = svg;
+        hover(node, { labels: cfg.cats, fmtV: cfg.fmtV, series: cfg.line ? cfg.series.concat([{ name: cfg.line.name, data: cfg.line.data, color: cfg.line.color }]) : cfg.series },
+          n, function (i) { return pl + slot * i + slot / 2; }, function () { return -30; }, pl, pw);
+      }
+      function hBars(node, cfg) {
+        var W = Math.max(node.clientWidth || 260, 180), rowH = cfg.rowH || 22, lw = cfg.labelW || 96;
+        var H = cfg.rows.length * rowH + 4, max = cfg.max || Math.max.apply(null, cfg.rows.map(function (r) { return r.v; })) * 1.1;
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(cfg.aria || "comparison") + '">';
+        cfg.rows.forEach(function (r, i) {
+          var yy = i * rowH + 3, bw = (W - lw - 42) * r.v / max;
+          svg += '<text x="0" y="' + (yy + 10) + '" fill="' + C.tx2 + '" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + esc(r.k) + '</text>';
+          svg += '<rect x="' + lw + '" y="' + yy + '" width="' + (W - lw - 42) + '" height="12" fill="#EDEEF2"/>';
+          svg += '<rect x="' + lw + '" y="' + yy + '" width="' + Math.max(bw, 1.2).toFixed(1) + '" height="12" fill="' + (r.color || C.iris) + '"/>';
+          svg += '<text x="' + W + '" y="' + (yy + 10) + '" text-anchor="end" fill="' + C.tx2 + '" font-size="10" font-family="IBM Plex Mono,monospace">' + esc(r.label) + '</text>';
+        });
+        node.innerHTML = svg + '</svg>';
+      }
+      function grouped(node, rows) {
+        var W = Math.max(node.clientWidth || 300, 220), rowH = 36, H = rows.length * rowH + 4;
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="before and after recovery">';
+        rows.forEach(function (r, i) {
+          var yy = i * rowH + 2, max = Math.max(r.a, r.b) * 1.28, aw = (W - 128) * r.a / max, bw = (W - 128) * r.b / max;
+          svg += '<text x="0" y="' + (yy + 9) + '" fill="' + C.tx2 + '" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + esc(r.k) + '</text>';
+          svg += '<rect x="112" y="' + (yy + 1) + '" width="' + Math.max(aw, 1.2).toFixed(1) + '" height="9" fill="' + C.grey + '"/>';
+          svg += '<text x="' + W + '" y="' + (yy + 9) + '" text-anchor="end" fill="' + C.tx3 + '" font-size="10" font-family="IBM Plex Mono,monospace">' + esc(r.al) + '</text>';
+          svg += '<rect x="112" y="' + (yy + 14) + '" width="' + Math.max(bw, 1.2).toFixed(1) + '" height="9" fill="' + C.iris + '"/>';
+          svg += '<text x="' + W + '" y="' + (yy + 22) + '" text-anchor="end" fill="' + C.tx2 + '" font-size="10" font-family="IBM Plex Mono,monospace">' + esc(r.bl) + '</text>';
+          if (i < rows.length - 1) svg += '<line x1="0" x2="' + W + '" y1="' + (yy + 30) + '" y2="' + (yy + 30) + '" stroke="' + C.hair + '"/>';
+        });
+        node.innerHTML = svg + '</svg>';
+      }
+      function donut(node, cfg) {
+        var W = Math.max(node.clientWidth || 240, 190), H = 150, cx = Math.min(W * 0.28, 74), cy = H / 2, r = 54, ir = 34;
+        var tot = cfg.slices.reduce(function (a, s) { return a + s.v; }, 0), ang = -Math.PI / 2;
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="recovery outcomes">';
+        cfg.slices.forEach(function (s) {
+          var a2 = ang + s.v / tot * Math.PI * 2, lg = (a2 - ang) > Math.PI ? 1 : 0;
+          var p = [cx + r * Math.cos(ang), cy + r * Math.sin(ang), cx + r * Math.cos(a2), cy + r * Math.sin(a2), cx + ir * Math.cos(a2), cy + ir * Math.sin(a2), cx + ir * Math.cos(ang), cy + ir * Math.sin(ang)];
+          svg += '<path d="M' + p[0] + ' ' + p[1] + ' A' + r + ' ' + r + ' 0 ' + lg + ' 1 ' + p[2] + ' ' + p[3] + ' L' + p[4] + ' ' + p[5] + ' A' + ir + ' ' + ir + ' 0 ' + lg + ' 0 ' + p[6] + ' ' + p[7] + ' Z" fill="' + s.color + '" stroke="#FFFFFF" stroke-width="1.5"/>'; ang = a2;
+        });
+        svg += '<text x="' + cx + '" y="' + (cy - 1) + '" text-anchor="middle" fill="#1B1D22" font-size="17" font-family="IBM Plex Mono,monospace">' + cfg.centre + '</text>';
+        svg += '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Sans,sans-serif">' + cfg.lab + '</text>';
+        var lx = cx + r + 16;
+        cfg.slices.forEach(function (s, i) {
+          var ly = cy - r + 12 + i * 21;
+          svg += '<rect x="' + lx + '" y="' + (ly - 7) + '" width="7" height="7" fill="' + s.color + '"/>';
+          svg += '<text x="' + (lx + 12) + '" y="' + ly + '" fill="' + C.tx2 + '" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + esc(s.k) + '</text>';
+          svg += '<text x="' + W + '" y="' + ly + '" text-anchor="end" fill="#1B1D22" font-size="10" font-family="IBM Plex Mono,monospace">' + s.v + '</text>';
+        });
+        node.innerHTML = svg + '</svg>';
+      }
+      function spark(node, cfg) {
+        var W = Math.max(node.clientWidth || 110, 60), H = 22, n = cfg.data.length;
+        var mx = Math.max.apply(null, cfg.data), mn = Math.min.apply(null, cfg.data), sp = (mx - mn) || 1;
+        var pts = cfg.data.map(function (v, i) { return [W * i / (n - 1), H - 2 - (v - mn) / sp * (H - 6)]; });
+        node.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><path d="' + pth(pts) + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="' + cfg.color + '" opacity=".10"/><path d="' + pth(pts) + '" fill="none" stroke="' + cfg.color + '" stroke-width="1.2"/><circle cx="' + pts[n - 1][0] + '" cy="' + pts[n - 1][1] + '" r="1.9" fill="' + cfg.color + '"/></svg>';
+      }
+      function depGraph(node) {
+        var W = Math.max(node.clientWidth || 620, 340), H = 216;
+        var ns = [{ id: "alb", k: "ALB", x: .06, y: .5, s: "warn", m: "18.4k rpm" },
+        { id: "web", k: "checkout-web", x: .29, y: .18, s: "ok", m: "6 tasks" },
+        { id: "pay", k: "payments-api", x: .29, y: .8, s: "crit", m: "5/8 tasks" },
+        { id: "ord", k: "orders-svc", x: .57, y: .18, s: "warn", m: "4 tasks" },
+        { id: "auth", k: "auth-svc", x: .57, y: .8, s: "ok", m: "3 tasks" },
+        { id: "rds", k: "aurora-pg", x: .85, y: .46, s: "ok", m: "CPU 46%" },
+        { id: "sqs", k: "ledger-queue", x: .85, y: .88, s: "warn", m: "2.1k depth" }];
+        var es = [["alb", "web", "9.2k · 0.1%", "ok"], ["alb", "pay", "9.2k · 6.4%", "crit"], ["web", "ord", "4.1k · 0.3%", "ok"],
+        ["pay", "auth", "8.8k · 0.2%", "ok"], ["pay", "rds", "7.4k · 1.9%", "warn"], ["ord", "rds", "3.9k · 0.1%", "ok"], ["pay", "sqs", "2.2k · 4.1%", "crit"]];
+        var m = {}; ns.forEach(function (n) { m[n.id] = { x: n.x * W, y: 28 + n.y * (H - 58) }; });
+        var col = { ok: C.ok, warn: C.warn, crit: C.crit };
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="service dependency graph">';
+        es.forEach(function (e) {
+          var a = m[e[0]], b = m[e[1]];
+          svg += '<path d="M' + a.x + ' ' + a.y + ' C ' + (a.x + 48) + ' ' + a.y + ', ' + (b.x - 48) + ' ' + b.y + ', ' + b.x + ' ' + b.y + '" fill="none" stroke="' + col[e[3]] + '" stroke-width="' + (e[3] === "crit" ? 1.7 : 1.1) + '" opacity="' + (e[3] === "ok" ? .28 : .7) + '"/>';
+          svg += '<text x="' + ((a.x + b.x) / 2) + '" y="' + ((a.y + b.y) / 2 - 5) + '" text-anchor="middle" fill="' + (e[3] === "ok" ? C.tx3 : C.tx2) + '" font-size="9" font-family="IBM Plex Mono,monospace">' + e[2] + '</text>';
+        });
+        ns.forEach(function (n) {
+          var p = m[n.id], w = n.k.length * 6.2 + 24;
+          svg += '<rect x="' + (p.x - w / 2) + '" y="' + (p.y - 15) + '" width="' + w + '" height="30" rx="2" fill="#FFFFFF" stroke="' + (n.s === "ok" ? C.line : col[n.s]) + '"/>';
+          svg += '<circle cx="' + (p.x - w / 2 + 10) + '" cy="' + (p.y - 4) + '" r="3" fill="' + col[n.s] + '"/>';
+          svg += '<text x="' + (p.x - w / 2 + 18) + '" y="' + (p.y - 1) + '" fill="#1B1D22" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + n.k + '</text>';
+          svg += '<text x="' + (p.x - w / 2 + 18) + '" y="' + (p.y + 10) + '" fill="' + C.tx3 + '" font-size="9" font-family="IBM Plex Mono,monospace">' + n.m + '</text>';
+        });
+        node.innerHTML = svg + '</svg>';
+      }
+      function corr(node) {
+        var W = Math.max(node.clientWidth || 480, 300);
+        var rows = [{ k: "Memory above 90%", a: 0, b: .18, c: C.crit }, { k: "OOM task kill", a: .16, b: .26, c: C.crit },
+        { k: "5xx rate above 2%", a: .2, b: .62, c: C.crit }, { k: "p99 latency above 3 s", a: .22, b: .66, c: C.warn },
+        { k: "Target group unhealthy", a: .3, b: .55, c: C.warn }, { k: "Ledger queue depth rising", a: .38, b: .74, c: C.warn }];
+        var rowH = 23, H = rows.length * rowH + 18, lw = 134, g;
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="correlated signal timeline">';
+        for (g = 0; g <= 4; g++) {
+          var gx = lw + (W - lw - 6) * g / 4;
+          svg += '<line x1="' + gx + '" x2="' + gx + '" y1="0" y2="' + (H - 16) + '" stroke="' + C.hair + '"/>';
+          svg += '<text x="' + gx + '" y="' + (H - 4) + '" text-anchor="middle" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">+' + (g * 4) + 'm</text>';
+        }
+        rows.forEach(function (r, i) {
+          var yy = i * rowH + 6, x1 = lw + (W - lw - 6) * r.a, x2 = lw + (W - lw - 6) * r.b;
+          svg += '<text x="0" y="' + (yy + 10) + '" fill="' + C.tx2 + '" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + r.k + '</text>';
+          svg += '<rect x="' + x1 + '" y="' + yy + '" width="' + Math.max(x2 - x1, 3) + '" height="11" rx="1" fill="' + r.c + '" opacity=".72"/>';
+        });
+        node.innerHTML = svg + '</svg>';
+      }
+
+      /* ── registry ── */
+      var R = {};
+      R.cpu = function (n) {
+        var L = labels(); lineChart(n, {
+          labels: L, threshold: 80, mark: [S, E], max: 100, ticks: 4, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "CPU utilization",
+          series: [{ name: "payments-api", color: C.iris, data: series(N(), { base: 34, noise: 7, seed: 11, event: function (t, y) { return y + bump(t, S, P, E, 56); } }) },
+          { name: "orders-svc", color: C.teal, data: series(N(), { base: 41, noise: 6, seed: 23, event: function (t, y) { return y + bump(t, S + .04, P, E, 14); } }) },
+          { name: "checkout-web", color: C.grey, data: series(N(), { base: 27, noise: 5, seed: 37 }) }]
+        });
+      };
+      R.mem = function (n) {
+        var L = labels(); lineChart(n, {
+          labels: L, threshold: 85, mark: [S, E], max: 100, ticks: 4, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "memory utilization",
+          series: [{ name: "payments-api", color: C.iris, data: series(N(), { base: 52, noise: 3, seed: 5, event: function (t, y) { return t < E ? y + ramp(t, 0, P) * 44 : y + 8; } }) },
+          { name: "orders-svc", color: C.teal, data: series(N(), { base: 58, noise: 4, seed: 19 }) },
+          { name: "checkout-web", color: C.grey, data: series(N(), { base: 44, noise: 4, seed: 29 }) }]
+        });
+      };
+      R.req = function (n) {
+        var L = labels(); lineChart(n, {
+          labels: L, fmtY: function (v) { return (v / 1000).toFixed(0) + "k"; }, fmtV: function (v) { return Math.round(v).toLocaleString(); }, aria: "request count",
+          series: [{ name: "This period", color: C.iris, fill: true, data: series(N(), { base: 16800, noise: 1700, seed: 41, event: function (t, y) { return y - bump(t, S, P, E, 4200); } }) },
+          { name: "Previous period", color: "#A9AFB8", dash: true, w: 1.1, data: series(N(), { base: 16200, noise: 1500, seed: 61 }) }]
+        });
+      };
+      R.lat = function (n) {
+        var L = labels(); lineChart(n, {
+          labels: L, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return Math.round(v) + " ms"; }, aria: "response time",
+          series: [{ name: "p99", color: C.iris, data: series(N(), { base: 640, noise: 90, seed: 13, event: function (t, y) { return y + bump(t, S, P, E, 3100); } }) },
+          { name: "p95", color: C.teal, data: series(N(), { base: 320, noise: 45, seed: 17, event: function (t, y) { return y + bump(t, S, P, E, 980); } }) },
+          { name: "p50", color: C.grey, data: series(N(), { base: 118, noise: 16, seed: 31, event: function (t, y) { return y + bump(t, S, P, E, 140); } }) }]
+        });
+      };
+      R.err = function (n) {
+        var m = Math.min(N(), 36), all = labels(), step = Math.ceil(all.length / m), L = [], i;
+        for (i = 0; i < all.length; i += step)L.push(all[i]);
+        var c = L.length;
+        var a = series(c, { base: 38, noise: 16, seed: 7 }).map(Math.round);
+        var b = series(c, { base: 3, noise: 3, seed: 9, event: function (t, y) { return y + bump(t, S, P, E, 148); } }).map(Math.round);
+        barChart(n, {
+          cats: L, stack: true, height: 150, fmtV: function (v) { return Math.round(v); }, aria: "HTTP 4xx and 5xx counts",
+          series: [{ name: "4xx", color: C.warn, data: a }, { name: "5xx", color: C.crit, data: b }],
+          line: { name: "Error rate %", color: C.iris2, data: b.map(function (v, i) { return (v + a[i] * .1) / 170 * 6; }), max: 8 }
+        });
+      };
+      R.db = function (n) {
+        var L = labels(); lineChart(n, {
+          labels: L, max: 100, ticks: 4, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "database health",
+          series: [{ name: "CPU", color: C.iris, data: series(N(), { base: 42, noise: 6, seed: 77, event: function (t, y) { return y + bump(t, S, P, E, 17); } }) },
+          { name: "Connections", color: C.teal, data: series(N(), { base: 64, noise: 7, seed: 83, event: function (t, y) { return y + bump(t, S, P, E, 22); } }) }]
+        });
+      };
+      R.heap = function (n) {
+        lineChart(n, {
+          height: 104, padLeft: 30, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return Math.round(v) + " MiB"; }, aria: "heap after GC",
+          series: [{ name: "Heap after GC", color: C.iris, fill: true, data: series(48, { base: 600, noise: 22, seed: 3, event: function (t, y) { return y + t * 1180; } }) }]
+        });
+      };
+      R.oom = function (n) {
+        barChart(n, {
+          height: 126, padLeft: 24, cats: ["04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15"], fmtV: function (v) { return Math.round(v) + " kills"; }, aria: "OOM kills per hour",
+          series: [{ name: "OOM kills", color: C.crit, data: [0, 0, 0, 0, 1, 2, 3, 5, 9, 12, 11, 4] }]
+        });
+      };
+      R.rcaRank = function (n) {
+        hBars(n, {
+          labelW: 152, max: 1, aria: "root cause candidate ranking", rows: [
+            { k: "Memory leak in v2.14.3", v: .91, label: "0.91", color: C.iris },
+            { k: "Connection pool exhaustion", v: .44, label: "0.44", color: "#8C97DE" },
+            { k: "Aurora writer contention", v: .27, label: "0.27", color: "#C6CAE4" },
+            { k: "Upstream retry storm", v: .19, label: "0.19", color: "#C6CAE4" },
+            { k: "Node disk pressure", v: .06, label: "0.06", color: "#E1E3E9" }]
+        });
+      };
+      R.blast = function (n) {
+        hBars(n, {
+          labelW: 96, max: 100, aria: "blast radius", rows: [
+            { k: "payments-api", v: 100, label: "8 tasks", color: C.crit },
+            { k: "checkout-web", v: 38, label: "retries", color: C.warn },
+            { k: "ledger-worker", v: 22, label: "queue lag", color: C.warn },
+            { k: "6 other services", v: 2, label: "none", color: C.grey }]
+        });
+      };
+      R.steps = function (n) {
+        hBars(n, {
+          labelW: 112, rowH: 20, aria: "step durations", rows: [
+            { k: "Detect", v: 42, label: "42 s", color: C.grey }, { k: "Correlate", v: 8, label: "8 s", color: C.grey },
+            { k: "Root cause", v: 31, label: "31 s", color: C.grey }, { k: "Safety check", v: 3, label: "3 s", color: C.grey },
+            { k: "Roll back", v: 94, label: "94 s", color: C.iris }, { k: "Verify", v: 60, label: "queued", color: "#E1E3E9" }]
+        });
+      };
+      R.ba = function (n) {
+        grouped(n, [
+          { k: "CPU utilization", a: 88, b: 34, al: "88%", bl: "34%" },
+          { k: "Memory utilization", a: 96, b: 51, al: "96%", bl: "51%" },
+          { k: "p95 latency", a: 1310, b: 212, al: "1,310 ms", bl: "212 ms" },
+          { k: "5xx rate", a: 6.4, b: .04, al: "6.40%", bl: "0.04%" },
+          { k: "Healthy tasks", a: 5, b: 8, al: "5 of 8", bl: "8 of 8" }]);
+      };
+      R.outcome = function (n) {
+        donut(n, {
+          centre: "69", lab: "attempts", slices: [
+            { k: "Verified", v: 59, color: C.iris }, { k: "Recovered on retry", v: 6, color: C.teal },
+            { k: "Escalated", v: 3, color: C.warn }, { k: "Failed", v: 1, color: C.crit }]
+        });
+      };
+      R.wf = function (n) {
+        hBars(n, {
+          labelW: 74, rowH: 20, aria: "executions by state", rows: [
+            { k: "Succeeded", v: 11, label: "11", color: C.ok }, { k: "Running", v: 1, label: "1", color: C.iris },
+            { k: "Failed", v: 1, label: "1", color: C.crit }, { k: "Aborted", v: 0, label: "0", color: C.grey }]
+        });
+      };
+      R.loop = function (n) {
+        lineChart(n, {
+          height: 130, padLeft: 30, threshold: 500, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return Math.round(v) + " ms"; }, aria: "supervisor loop duration",
+          series: [{ name: "Loop duration", color: C.iris, data: series(60, { base: 280, noise: 60, seed: 101, event: function (t, y) { return y + bump(t, .55, .7, .85, 190); } }) }]
+        });
+      };
+      R.corr = function (n) { corr(n); };
+      R.dep = function (n) { depGraph(n); };
+      R.spkMttd = function (n) { spark(n, { color: C.iris, data: [121, 108, 96, 84, 77, 68, 60, 42] }); };
+      R.spkMttr = function (n) { spark(n, { color: C.iris, data: [14.2, 12.8, 11.1, 9.6, 8.4, 6.9, 5.2, 4.2] }); };
+      R.spkSucc = function (n) { spark(n, { color: C.teal, data: [81, 84, 83, 88, 90, 91, 93, 94.2] }); };
+      R.spkRca = function (n) { spark(n, { color: C.warn, data: [76, 79, 83, 86, 88, 90.7, 90.5, 88.6] }); };
+      R.spkAudit = function (n) { spark(n, { color: C.teal, data: [98, 99, 100, 100, 99, 100, 100, 100] }); };
+
+      /* ── tables and lists ── */
+      var SVC = [["payments-api", 5, 8, 88, 96, "1,310 ms", "6.40%", "v2.14.3", "crit", "Unhealthy"],
+      ["orders-svc", 4, 4, 55, 62, "286 ms", "0.31%", "v1.8.0", "warn", "Degraded"],
+      ["checkout-web", 6, 6, 27, 44, "164 ms", "0.08%", "v3.2.1", "ok", "Healthy"],
+      ["auth-svc", 3, 3, 31, 38, "92 ms", "0.02%", "v1.4.7", "ok", "Healthy"],
+      ["ledger-worker", 4, 4, 46, 57, "—", "0.00%", "v0.9.12", "warn", "Queue lag"],
+      ["notify-svc", 2, 2, 18, 29, "71 ms", "0.01%", "v2.0.3", "ok", "Healthy"],
+      ["search-api", 3, 3, 39, 48, "203 ms", "0.06%", "v5.1.0", "ok", "Healthy"],
+      ["pricing-svc", 2, 2, 24, 36, "118 ms", "0.03%", "v1.1.9", "ok", "Healthy"],
+      ["admin-api", 1, 1, 12, 22, "141 ms", "0.00%", "v0.7.4", "ok", "Healthy"]];
+      function bar(v) { return '<span class="mb"><i class="' + (v > 85 ? "crit" : v > 60 ? "warn" : "ok") + '" style="width:' + v + '%"></i></span> <span class="num" style="font-size:11px;color:var(--tx2)">' + v + '%</span>'; }
+      document.getElementById("svcRows").innerHTML = SVC.map(function (s) {
+        return '<tr><td><span class="svc"><i class="dot ' + s[8] + '"></i>' + s[0] + '</span></td><td class="num">' + s[1] + '/' + s[2] + '</td>' +
+          '<td>' + bar(s[3]) + '</td><td>' + bar(s[4]) + '</td><td class="r num">' + s[5] + '</td>' +
+          '<td class="r num" style="color:' + (s[8] === "crit" ? "#B3282F" : "var(--tx2)") + '">' + s[6] + '</td>' +
+          '<td class="num" style="color:var(--tx2)">' + s[7] + '</td><td><span class="tag ' + s[8] + '">' + s[9] + '</span></td></tr>';
+      }).join("");
+
+      document.getElementById("depRows").innerHTML = [["payments-api", "v2.14.3", "08:12", "warn", "Suspect"],
+      ["orders-svc", "v1.8.0", "06:40", "ok", "Stable"], ["search-api", "v5.1.0", "21:05", "ok", "Stable"],
+      ["checkout-web", "v3.2.1", "18:22", "ok", "Stable"], ["notify-svc", "v2.0.3", "14:07", "ok", "Stable"],
+      ["pricing-svc", "v1.1.9", "11:30", "ok", "Stable"]].map(function (d) {
+        return '<tr><td>' + d[0] + '</td><td class="num" style="color:var(--tx2)">' + d[1] + '</td><td class="num" style="color:var(--tx2)">' + d[2] + '</td><td><span class="tag ' + d[3] + '">' + d[4] + '</span></td></tr>';
+      }).join("");
+
+      document.getElementById("agentRows").innerHTML = [["supervisor.py", "ok", "Running", "0", "284 ms", "4 s"],
+      ["detector.py", "ok", "Running", "2", "96 ms", "3 s"], ["correlation.py", "ok", "Running", "0", "41 ms", "6 s"],
+      ["rca.py", "ok", "Running", "1", "6.4 s", "9 s"], ["ai_reasoning.py", "warn", "Throttled", "3", "8.1 s", "11 s"],
+      ["policy.py", "ok", "Running", "0", "12 ms", "2 s"], ["controller.py", "ok", "Running", "1", "210 ms", "5 s"],
+      ["workflow.py", "ok", "Running", "1", "—", "7 s"]].map(function (a) {
+        return '<tr><td><span class="svc"><i class="dot ' + a[1] + '"></i><span class="mono" style="font-size:11px">' + a[0] + '</span></span></td>' +
+          '<td style="color:var(--tx2)">' + a[2] + '</td><td class="r num">' + a[3] + '</td><td class="r num" style="color:var(--tx2)">' + a[4] + '</td><td class="r num" style="color:var(--tx3)">' + a[5] + '</td></tr>';
+      }).join("");
+
+      var INC = [["INC-2481", "payments-api", "Memory saturation with 5xx surge", "p1", "P1", "Recovering", "12:03:40", "41m", "AEGIS agent", "91%", 1],
+      ["INC-2479", "orders-svc", "Retry budget exhaustion", "p2", "P2", "Diagnosing", "12:11:02", "33m", "AEGIS agent", "74%", 0],
+      ["INC-2476", "search-api", "Elevated p99 on index refresh", "p3", "P3", "Monitoring", "09:48:19", "2h 56m", "s.raman", "68%", 0],
+      ["INC-2470", "ledger-worker", "Queue depth above threshold", "p3", "P3", "Resolved", "Yest 23:14", "18m", "AEGIS agent", "83%", 0],
+      ["INC-2468", "auth-svc", "Token cache eviction storm", "p2", "P2", "Resolved", "Yest 19:02", "9m", "AEGIS agent", "89%", 0],
+      ["INC-2465", "orders-svc", "Traffic surge saturation", "p3", "P3", "Resolved", "Yest 14:41", "12m", "AEGIS agent", "81%", 0]];
+      document.getElementById("incRows").innerHTML = INC.map(function (r) {
+        var t = r[5] === "Resolved" ? "ok" : r[5] === "Recovering" ? "warn" : r[5] === "Diagnosing" ? "iris" : "info";
+        return '<tr class="' + (r[10] ? "sel" : "") + '"><td class="num">' + r[0] + '</td><td>' + r[1] + '</td><td style="color:var(--tx2)">' + r[2] + '</td>' +
+          '<td><span class="sev ' + r[3] + '">' + r[4] + '</span></td><td><span class="tag ' + t + '">' + r[5] + '</span></td>' +
+          '<td class="num" style="color:var(--tx2)">' + r[6] + '</td><td class="num" style="color:var(--tx2)">' + r[7] + '</td><td style="color:var(--tx2)">' + r[8] + '</td><td class="r num">' + r[9] + '</td></tr>';
+      }).join("");
+
+      document.getElementById("incDetail").innerHTML = [["Incident ID", "<span class='mono'>INC-2481</span>"],
+      ["Service", "payments-api"], ["Anomaly", "Memory saturation, 5xx surge"], ["Severity", "<span class='sev p1'>P1</span>"],
+      ["Status", "<span class='tag warn'>Recovering</span>"], ["First signal", "12:03:40 IST"],
+      ["Detected", "12:04:22 <span style='color:var(--tx3)'>(+42 s)</span>"], ["Correlated signals", "6"],
+      ["Impact", "18.4% of requests"], ["Root cause", "Memory leak in v2.14.3"], ["Action", "Rollback to v2.14.2"],
+      ["Store", "<span class='mono' style='font-size:10.5px'>aegis-incidents</span>"]].map(function (k) {
+        return '<div class="kv"><span class="k">' + k[0] + '</span><span class="v">' + k[1] + '</span></div>';
+      }).join("");
+
+      document.getElementById("alertBody").innerHTML = [["crit", "INC-2481 escalated", "Tier-0 rollback needs operator approval", "3m"],
+      ["warn", "Aurora pool at 78%", "Approaching the 85% alarm threshold", "11m"],
+      ["warn", "orders-svc retry budget 62%", "Downstream payments-api is failing", "14m"],
+      ["info", "Chaos run CHX-0412 blocked", "A P1 incident is open on the target", "22m"]].map(function (a) {
+        return '<div class="alert"><i class="dot ' + a[0] + '" style="margin-top:4px"></i><div><div class="t">' + a[1] + '</div><div class="m">' + a[2] + '</div></div><div class="w2">' + a[3] + '</div></div>';
+      }).join("");
+
+      document.getElementById("escBody").innerHTML = [["crit", "INC-2481 · payments-api", "Rollback on a tier-0 service needs approval", "3m 12s"],
+      ["warn", "INC-2479 · orders-svc", "Confidence 74% is below the 85% threshold", "9m 40s"],
+      ["info", "INC-2476 · search-api", "Assigned to s.raman, no action proposed", "2h 56m"]].map(function (a) {
+        return '<div class="alert"><i class="dot ' + a[0] + '" style="margin-top:4px"></i><div><div class="t">' + a[1] + '</div><div class="m">' + a[2] + '</div></div><div class="w2">' + a[3] + '</div></div>';
+      }).join("");
+
+      document.getElementById("reasonSteps").innerHTML = [
+        ["done", "Memory is the leading signal", "Memory climbed monotonically from 52% to 96% over 3 h 40 m while CPU stayed flat until tasks began dying. A load-driven cause would move both together.", "Correlation with 5xx: 0.94"],
+        ["done", "The climb starts at a deploy boundary", "Growth begins within four minutes of v2.14.3 reaching all tasks at 08:12. The previous two deploys show no comparable slope.", "Change proximity: 0.86"],
+        ["done", "Heap is not reclaimed after GC", "Post-GC heap rises 41 MiB/hour on every task independently, so this is retention rather than traffic pressure.", "47 OutOfMemoryError entries"],
+        ["done", "Database and upstream causes are ruled out", "Aurora CPU peaked at 46% with no deadlocks and upstream 429s stayed at zero. Pool saturation follows the incident rather than preceding it.", "Both candidates below 0.45"],
+        ["run", "Rollback is the lowest-risk remedy", "Restarting clears the symptom for about 3.5 hours and would repeat. Raising the memory limit delays it. Rolling back removes the change that introduced the leak.", "Reversible in 90 s"]
+      ].map(function (s) { return '<div class="step ' + s[0] + '"><div class="mk">' + (s[0] === "run" ? "→" : "✓") + '</div><div><div class="t">' + s[1] + '</div><div class="d">' + s[2] + '</div><div class="m">' + s[3] + '</div></div></div>'; }).join("");
+
+      document.getElementById("wfSteps").innerHTML = [
+        ["done", "Detection", "Anomaly raised by supervisor.py", "12:04:22 · 42 s"],
+        ["done", "Correlation", "6 signals grouped into INC-2481", "12:04:30 · 8 s"],
+        ["done", "Root cause analysis", "Memory leak in v2.14.3 at 91% confidence", "12:05:01 · 31 s"],
+        ["done", "Safety evaluation", "Medium risk, 18.4% of traffic, reversible", "12:05:04 · 3 s"],
+        ["run", "Recovery", "Rolling back 8 tasks to v2.14.2 — 5 complete", "12:09:11 · running"],
+        ["", "Verification", "Five-minute health comparison against baseline", "Queued"]
+      ].map(function (s) { return '<div class="step ' + s[0] + '"><div class="mk">' + (s[0] === "done" ? "✓" : s[0] === "run" ? "→" : "·") + '</div><div><div class="t">' + s[1] + '</div><div class="d">' + s[2] + '</div><div class="m">' + s[3] + '</div></div></div>'; }).join("");
+
+      document.getElementById("recRows").innerHTML = [
+        ["12:09:11", "INC-2481", "payments-api", "Rollback to v2.14.2", "r.shah", "2m 48s", "warn", "Running"],
+        ["09:52:04", "INC-2476", "search-api", "Scale 3 → 5 tasks", "Autonomous", "3m 10s", "ok", "Verified"],
+        ["23:16:40", "INC-2470", "ledger-worker", "Restart 2 tasks", "Autonomous", "1m 44s", "ok", "Verified"],
+        ["19:03:55", "INC-2468", "auth-svc", "Restart 3 tasks", "Autonomous", "58s", "ok", "Verified"],
+        ["14:41:20", "INC-2465", "orders-svc", "Scale 4 → 6 tasks", "Autonomous", "2m 02s", "ok", "Verified"],
+        ["11:07:33", "INC-2461", "payments-api", "Rollback to v2.13.9", "r.shah", "4m 36s", "crit", "Failed, retried"],
+        ["08:22:10", "INC-2458", "notify-svc", "Restart 1 task", "Autonomous", "41s", "ok", "Verified"]
+      ].map(function (r) {
+        return '<tr><td class="num" style="color:var(--tx2)">' + r[0] + '</td><td class="num">' + r[1] + '</td><td>' + r[2] + '</td>' +
+          '<td style="color:var(--tx2)">' + r[3] + '</td><td>' + r[4] + '</td><td class="r num" style="color:var(--tx2)">' + r[5] + '</td><td><span class="tag ' + r[6] + '">' + r[7] + '</span></td></tr>';
+      }).join("");
+
+      document.getElementById("chaosRows").innerHTML = [
+        ["Today 10:14", "Memory pressure", "orders-svc", "5 min", "48 s", "2m 10s", "ok", "Detected and recovered"],
+        ["Today 07:30", "Task failure", "notify-svc", "2 min", "11 s", "36 s", "ok", "Detected and recovered"],
+        ["Yest 16:02", "Latency injection", "checkout-web", "5 min", "44 s", "3m 04s", "warn", "Slow detection"],
+        ["Yest 11:45", "CPU spike", "search-api", "2 min", "26 s", "1m 52s", "ok", "Detected and recovered"],
+        ["17 Sep 15:20", "Memory pressure", "ledger-worker", "10 min", "68 s", "4m 40s", "crit", "Missed MTTD target"],
+        ["17 Sep 09:02", "Task failure", "pricing-svc", "2 min", "14 s", "47 s", "ok", "Detected and recovered"]
+      ].map(function (r) {
+        return '<tr><td class="num" style="color:var(--tx2)">' + r[0] + '</td><td>' + r[1] + '</td><td style="color:var(--tx2)">' + r[2] + '</td>' +
+          '<td class="num" style="color:var(--tx2)">' + r[3] + '</td><td class="r num">' + r[4] + '</td><td class="r num">' + r[5] + '</td><td><span class="tag ' + r[6] + '">' + r[7] + '</span></td></tr>';
+      }).join("");
+
+      document.getElementById("auditRows").innerHTML = [
+        ["12:09:11", "INC-2481", "Memory leak v2.14.3", "Rollback to v2.14.2", "r.shah", "warn", "In progress"],
+        ["12:05:04", "INC-2481", "Memory leak v2.14.3", "Safety evaluation", "policy.py", "info", "Human review"],
+        ["12:05:01", "INC-2481", "Memory leak v2.14.3", "RCA completed, 91%", "rca.py", "ok", "Recorded"],
+        ["12:04:22", "INC-2481", "—", "Incident opened", "supervisor.py", "info", "Recorded"],
+        ["11:58:02", "INC-2479", "Retry budget exhaustion", "No action proposed", "rca.py", "warn", "Below threshold"],
+        ["09:52:04", "INC-2476", "Index refresh contention", "Scale 3 → 5 tasks", "controller.py", "ok", "Verified"],
+        ["23:16:40", "INC-2470", "Consumer stall", "Restart 2 tasks", "controller.py", "ok", "Verified"],
+        ["19:03:55", "INC-2468", "Cache eviction storm", "Restart 3 tasks", "controller.py", "ok", "Verified"],
+        ["14:41:20", "INC-2465", "Traffic surge", "Scale 4 → 6 tasks", "controller.py", "ok", "Verified"],
+        ["11:07:33", "INC-2461", "Bad revision v2.14.0", "Rollback to v2.13.9", "r.shah", "crit", "Failed, retried"],
+        ["08:22:10", "INC-2458", "Thread pool deadlock", "Restart 1 task", "controller.py", "ok", "Verified"],
+        ["04:11:47", "INC-2455", "Certificate rotation lag", "Escalated to operator", "controller.py", "warn", "Operator resolved"]
+      ].map(function (r) {
+        return '<tr><td class="num" style="color:var(--tx2)">' + r[0] + '</td><td class="num">' + r[1] + '</td><td style="color:var(--tx2)">' + r[2] + '</td>' +
+          '<td>' + r[3] + '</td><td class="mono" style="font-size:11px;color:var(--tx2)">' + r[4] + '</td><td><span class="tag ' + r[5] + '">' + r[6] + '</span></td></tr>';
+      }).join("");
+
+      var LOGS = [["12:41:52", "FATAL", "payments-api", "java.lang.OutOfMemoryError: Java heap space in ChargeProcessor.settle()"],
+      ["12:41:52", "ERROR", "payments-api", "Task 8f2a1c stopped: essential container exited with code 137"],
+      ["12:40:18", "ERROR", "payments-api", "Upstream timeout after 5000ms calling ledger-queue.enqueue"],
+      ["12:39:44", "WARN", "orders-svc", "Retry budget 62% consumed for payments-api.charge"],
+      ["12:38:02", "ERROR", "alb-prod", "HTTP 502 for POST /v2/charge — target returned no response"],
+      ["12:36:31", "WARN", "payments-api", "GC pause 1842ms, old gen 1.93 GiB of 2.00 GiB"],
+      ["12:34:09", "INFO", "supervisor", "Anomaly candidate: memory_saturation payments-api score 0.88"],
+      ["12:33:57", "WARN", "aurora-pg", "Connection pool 78% saturated (312 of 400)"],
+      ["12:31:12", "ERROR", "payments-api", "Circuit breaker opened for ledger-queue after 12 failures"],
+      ["12:28:40", "INFO", "supervisor", "Detection cycle complete in 284ms, 9 services sampled"],
+      ["12:26:15", "WARN", "ledger-worker", "Queue depth 2104 exceeds warning threshold 1500"],
+      ["12:22:03", "INFO", "ecs-agent", "Task 4d9b77 registered in target group tg-payments"],
+      ["12:19:41", "ERROR", "payments-api", "Unhandled rejection in settlement batch 88213"],
+      ["12:14:08", "INFO", "controller", "Policy evaluation requested for candidate INC-2481"],
+      ["12:09:11", "INFO", "workflow", "Execution aegis-recover-2481 started"]];
+      function renderLogs(lv) {
+        document.getElementById("logBody").innerHTML = LOGS.filter(function (l) { return lv === "all" || l[1] === lv || (lv === "ERROR" && l[1] === "FATAL"); })
+          .map(function (l) { return '<div class="lg"><span class="ts">' + l[0] + '</span><span class="lv ' + l[1] + '">' + l[1] + '</span><span class="src">' + l[2] + '</span><span class="msg" title="' + esc(l[3]) + '">' + esc(l[3]) + '</span></div>'; }).join("");
+      }
+      renderLogs("all");
+      (function () { var g = document.getElementById("gauge"), h = "", i; for (i = 0; i < 20; i++)h += '<s class="' + (i < 18 ? "f" : i < 19 ? "p" : "") + '"></s>'; g.innerHTML = h; })();
+
+      /* ── behaviour ── */
+      function draw(root) {
+        (root || document).querySelectorAll("[data-chart]").forEach(function (n) {
+          if (!n.clientWidth) return; var f = R[n.getAttribute("data-chart")]; if (f) f(n);
+        });
+      }
+      draw();
+
+      document.querySelectorAll(".sec-h").forEach(function (h) {
+        h.addEventListener("click", function () {
+          var s = h.parentElement, closed = s.classList.toggle("closed");
+          h.setAttribute("aria-expanded", String(!closed));
+          if (!closed) draw(s);
+        });
+      });
+
+      document.getElementById("rangeSeg").addEventListener("click", function (e) {
+        var b = e.target.closest("button"); if (!b) return;
+        range = b.getAttribute("data-range");
+        this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+        draw();
+      });
+      document.getElementById("refreshBtn").addEventListener("click", function () { draw(); });
+      document.getElementById("logSeg").addEventListener("click", function (e) {
+        var b = e.target.closest("button"); if (!b) return;
+        this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+        renderLogs(b.getAttribute("data-lv"));
+      });
+      document.getElementById("incRows").addEventListener("click", function (e) {
+        var tr = e.target.closest("tr"); if (!tr) return;
+        this.querySelectorAll("tr").forEach(function (r) { r.classList.toggle("sel", r === tr); });
+      });
+
+      var links = [].slice.call(document.querySelectorAll(".index a"));
+      var obs = new IntersectionObserver(function (es) {
+        es.forEach(function (en) {
+          if (en.isIntersecting) {
+            links.forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id); });
+          }
+        });
+      }, { rootMargin: "-80px 0px -70% 0px" });
+      document.querySelectorAll(".sec").forEach(function (s) { obs.observe(s); });
+
+      var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { draw(); }, 140); });
+    })();
+  </script>
+</body>
+
+</html>
