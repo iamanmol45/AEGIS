@@ -151,6 +151,39 @@ class IncidentStore:
         )
         return incidents[:limit]
 
+    def get_items_by_type(
+        self,
+        record_type: str,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Scan and retrieve items tagged with a given `record_type` (used for
+        non-incident records, e.g. chaos test summaries, that share this
+        table so they get the same cross-replica persistence as incidents).
+        """
+        items: List[Dict[str, Any]] = []
+
+        if self.table and self._dynamodb_available:
+            try:
+                response = self.table.scan(
+                    FilterExpression="record_type = :rt",
+                    ExpressionAttributeValues={":rt": record_type},
+                    Limit=limit,
+                )
+                items = [_from_dynamodb_item(i) for i in response.get("Items", [])]
+            except (ClientError, BotoCoreError, Exception) as e:
+                logger.warning(f"Failed to scan DynamoDB for record_type={record_type}: {e}")
+                items = []
+
+        if not items:
+            items = [
+                i for i in self._fallback_memory.values()
+                if i.get("record_type") == record_type
+            ]
+
+        items.sort(key=lambda x: str(x.get("timestamp", "")), reverse=True)
+        return items[:limit]
+
     def update_incident(
         self,
         incident_id: str,

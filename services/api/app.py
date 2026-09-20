@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from policy import RemediationPolicy
 from remediation import RemediationEngine
@@ -21,6 +22,17 @@ from evidence import EvidenceStore
 app = FastAPI(
     title="AEGIS Autonomous Cloud Infrastructure",
     version="1.0.0",
+)
+
+# The ALB is already open to the public internet with no auth on any route
+# (see ARCHITECTURE_V2.md item 5), so permissive CORS doesn't widen the
+# existing blast radius -- it just lets the browser dashboard read responses
+# it could already fetch via curl.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
 
 policy = RemediationPolicy()
@@ -461,7 +473,7 @@ def step_function_test(incident: dict = None):
 
     workflow_result = workflow_manager.wait_for_completion(
         exec_info["execution_arn"],
-        timeout_seconds=120
+        timeout_seconds=150
     )
 
     audit_logger.log({
@@ -545,7 +557,7 @@ def task_failure_workflow_test(incident: dict = None):
 
     workflow_result = workflow_manager.wait_for_completion(
         exec_info["execution_arn"],
-        timeout_seconds=120
+        timeout_seconds=150
     )
 
     audit_logger.log({

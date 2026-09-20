@@ -63,7 +63,7 @@ class StepFunctionsWorkflowManager:
             "target_desired_count": target_desired_count,
         }
 
-    def wait_for_completion(self, execution_arn, timeout_seconds=120, poll_interval=5):
+    def wait_for_completion(self, execution_arn, timeout_seconds=150, poll_interval=5):
         start_time = time.time()
 
         while time.time() - start_time < timeout_seconds:

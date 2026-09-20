@@ -1121,144 +1121,116 @@
       <b>AEGIS</b>
     </span>
     <span>Dashboards</span><span class="sep">/</span>
-    <span class="cur">aegis-production</span>
+    <span class="cur">aegis-api-service</span>
     <span class="right">
-      <span>Auto refresh 1m</span><span>Updated 12:44:08 IST</span><span class="who">RS</span>
+      <span id="connState">Connecting…</span><span id="updatedAt">—</span>
     </span>
   </div>
 
   <div class="toolbar">
-    <h1>aegis-production</h1>
-    <span class="meta">acme-prod-1 · ap-south-1</span>
+    <h1>AEGIS live dashboard</h1>
+    <span class="meta">aegis-cluster · ap-south-1</span>
     <div class="tools">
-      <select class="ctl" id="svcFilter" aria-label="Filter by service">
-        <option>All services</option>
-        <option>payments-api</option>
-        <option>orders-svc</option>
-        <option>checkout-web</option>
-        <option>ledger-worker</option>
-      </select>
-      <div class="seg" id="rangeSeg" role="group" aria-label="Time range">
-        <button data-range="1h">1h</button><button data-range="3h">3h</button>
-        <button class="on" data-range="12h">12h</button><button data-range="1d">1d</button>
-        <button data-range="3d">3d</button><button data-range="1w">1w</button>
-      </div>
       <select class="ctl" id="refreshSel" aria-label="Refresh interval">
-        <option>1m</option>
-        <option>10s</option>
-        <option>5m</option>
-        <option>Off</option>
+        <option value="10000">Every 10s</option>
+        <option value="30000" selected>Every 30s</option>
+        <option value="60000">Every 1m</option>
+        <option value="0">Off</option>
       </select>
       <button class="ctl" id="refreshBtn" title="Refresh now">Refresh</button>
-      <button class="ctl">Actions</button>
-      <button class="ctl pri">Save</button>
     </div>
   </div>
 
   <nav class="index" id="index" aria-label="Dashboard sections">
     <a href="#s-overview" class="on">System overview</a>
     <a href="#s-metrics">Application metrics</a>
-    <a href="#s-errors">Errors &amp; database</a>
     <a href="#s-services">Service health</a>
     <a href="#s-incidents">Incidents</a>
     <a href="#s-rca">Root cause</a>
     <a href="#s-safety">Safety &amp; policy</a>
     <a href="#s-recovery">Recovery</a>
     <a href="#s-chaos">Chaos</a>
-    <a href="#s-logs">Logs, audit &amp; system</a>
   </nav>
 
   <!-- ══ 1 · SYSTEM OVERVIEW ══ -->
   <section class="sec" id="s-overview">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>System overview</h2>
-      <span class="note">Overall health and operating metrics</span>
-      <span class="right"><span class="tag warn">1 active P1</span></span>
+      <span class="note">Live from GET /status</span>
+      <span class="right" id="overviewBadge"><span class="tag">—</span></span>
     </button>
     <div class="body">
       <div class="w s2">
         <div class="w-h">
           <h3>Overall system health</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Aggregated from ECS service state, CloudWatch alarms and open incidents</div>
+        <div class="w-u">aegis-api-service task health, from ECS via GET /status</div>
         <div class="health">
-          <svg class="ring" viewBox="0 0 44 44" aria-hidden="true">
+          <svg class="ring" viewBox="0 0 44 44" aria-hidden="true" id="healthRing">
             <circle cx="22" cy="22" r="18" fill="none" stroke="#E9EBEF" stroke-width="5" />
-            <circle cx="22" cy="22" r="18" fill="none" stroke="#C08415" stroke-width="5" stroke-dasharray="100.5 113.1"
-              stroke-linecap="butt" transform="rotate(-90 22 22)" />
+            <circle id="healthArc" cx="22" cy="22" r="18" fill="none" stroke="#98A0AB" stroke-width="5"
+              stroke-dasharray="0 113.1" stroke-linecap="butt" transform="rotate(-90 22 22)" />
           </svg>
-          <div><b>Warning</b>
-            <p>8 of 9 services healthy. payments-api is failing health checks while an autonomous recovery runs.</p>
+          <div><b id="healthLabel">—</b>
+            <p id="healthDetail">Waiting for first response from the API…</p>
           </div>
         </div>
         <div class="hsplit">
           <div>
-            <div class="n" style="color:#1E7A50">8</div>
-            <div class="l">Healthy</div>
+            <div class="n" id="statRunning">—</div>
+            <div class="l">Running tasks</div>
           </div>
           <div>
-            <div class="n" style="color:#8A5D0B">1</div>
-            <div class="l">Warning</div>
+            <div class="n" id="statDesired">—</div>
+            <div class="l">Desired tasks</div>
           </div>
           <div>
-            <div class="n" style="color:#B3282F">1</div>
-            <div class="l">Critical</div>
-          </div>
-          <div>
-            <div class="n">3</div>
+            <div class="n" id="statOpenInc">—</div>
             <div class="l">Open incidents</div>
           </div>
+          <div>
+            <div class="n" id="statChaosRuns">—</div>
+            <div class="l">Chaos runs</div>
+          </div>
         </div>
       </div>
       <div class="w">
         <div class="w-h">
-          <h3>MTTD</h3><span class="dots">⋯</span>
+          <h3>CPU utilization</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Mean time to detect · seconds</div>
-        <div class="kv-big">42<s>s</s></div>
-        <div class="delta up">▼ 18 s vs previous week</div>
-        <div class="chart spark" data-chart="spkMttd"></div>
+        <div class="w-u">Current · GET /status</div>
+        <div class="kv-big" id="kpiCpu">—</div>
+        <div class="delta fl" id="kpiCpuNote">Waiting for data</div>
+        <div class="chart spark" data-chart="spkCpu"></div>
       </div>
       <div class="w">
         <div class="w-h">
-          <h3>MTTR</h3><span class="dots">⋯</span>
+          <h3>Memory utilization</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Mean time to recovery · minutes</div>
-        <div class="kv-big">4<s>m</s> 11<s>s</s></div>
-        <div class="delta up">▼ 1 m 02 s vs previous week</div>
-        <div class="chart spark" data-chart="spkMttr"></div>
+        <div class="w-u">Current · GET /status</div>
+        <div class="kv-big" id="kpiMem">—</div>
+        <div class="delta fl" id="kpiMemNote">Waiting for data</div>
+        <div class="chart spark" data-chart="spkMem"></div>
       </div>
       <div class="w">
         <div class="w-h">
-          <h3>Recovery success rate</h3><span class="dots">⋯</span>
+          <h3>Total incidents</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Verified recoveries ÷ attempts</div>
-        <div class="kv-big">94.2<s>%</s></div>
-        <div class="delta fl">65 verified of 69 attempts</div>
-        <div class="chart spark" data-chart="spkSucc"></div>
+        <div class="w-u">All time · DynamoDB AegisIncidents</div>
+        <div class="kv-big" id="kpiTotalInc">—</div>
+        <div class="delta fl" id="kpiOpenInc">—</div>
       </div>
       <div class="w">
         <div class="w-h">
-          <h3>RCA accuracy</h3><span class="dots">⋯</span>
+          <h3>Chaos recovery rate</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Root causes confirmed on operator review</div>
-        <div class="kv-big">88.6<s>%</s></div>
-        <div class="delta dn">▲ 2.1 pts below last week</div>
-        <div class="chart spark" data-chart="spkRca"></div>
-      </div>
-      <div class="w s2">
-        <div class="w-h">
-          <h3>Audit completeness</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Records with all 14 required fields</div>
-        <div class="kv-big">100<s>%</s></div>
-        <div class="delta fl">69 of 69 records complete</div>
-        <div class="chart spark" data-chart="spkAudit"></div>
+        <div class="w-u">Verified recoveries ÷ non-blocked attempts</div>
+        <div class="kv-big" id="kpiRecoveryRate">—</div>
+        <div class="delta fl" id="kpiRecoveryNote">Waiting for /chaos/history</div>
       </div>
       <div class="w s4 pad0">
         <div class="wt">
-          <h3>System status</h3><span class="u">AEGIS agent and integration telemetry</span>
-          <span class="right"><span class="tag warn">1 agent throttled</span></span>
+          <h3>System status</h3><span class="u">Live subsystem state</span>
         </div>
         <div class="tw h200">
           <table>
@@ -1266,12 +1238,11 @@
               <tr>
                 <th>Component</th>
                 <th>State</th>
-                <th class="r">Queue</th>
-                <th class="r">Last cycle</th>
-                <th class="r">Heartbeat</th>
+                <th>Detail</th>
+                <th class="r">Source</th>
               </tr>
             </thead>
-            <tbody id="agentRows"></tbody>
+            <tbody id="sysRows"></tbody>
           </table>
         </div>
       </div>
@@ -1282,109 +1253,41 @@
   <section class="sec" id="s-metrics">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>Application metrics</h2>
-      <span class="note">CloudWatch and ALB, 1-minute resolution</span>
-      <span class="right"><span class="note">GET /status</span></span>
+      <span class="note">CloudWatch via GET /status, sampled client-side since page load</span>
     </button>
-    <div class="sub"><b>Compute</b> · ECS task averages, acme-prod-1</div>
-    <div class="body">
-      <div class="w">
-        <div class="w-h">
-          <h3>CPU utilization</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Percent</div>
-        <div class="chart" data-chart="cpu"></div>
-        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>payments-api</span><span><i class="ln"
-              style="background:#17817E"></i>orders-svc</span><span><i class="ln"
-              style="background:#98A0AB"></i>checkout-web</span></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Memory utilization</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Percent of 2 GiB task limit</div>
-        <div class="chart" data-chart="mem"></div>
-        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>payments-api</span><span><i class="ln"
-              style="background:#17817E"></i>orders-svc</span><span><i class="ln"
-              style="background:#98A0AB"></i>checkout-web</span></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Request count</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Requests per minute · ALB</div>
-        <div class="chart" data-chart="req"></div>
-        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>This period</span><span><i class="ln"
-              style="background:#A9AFB8"></i>Previous period</span></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Response time</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Target response time · milliseconds</div>
-        <div class="chart" data-chart="lat"></div>
-        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>p99</span><span><i class="ln"
-              style="background:#17817E"></i>p95</span><span><i class="ln" style="background:#98A0AB"></i>p50</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ 3 · ERRORS & DATABASE ══ -->
-  <section class="sec" id="s-errors">
-    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
-      <h2>Errors and database</h2>
-      <span class="note">HTTP error monitoring and RDS health</span>
-    </button>
+    <div class="sub"><b>Compute</b> · aegis-api-service, ap-south-1</div>
     <div class="body">
       <div class="w s2">
         <div class="w-h">
-          <h3>HTTP error monitoring</h3><span class="dots">⋯</span>
+          <h3>CPU utilization</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Responses per minute, with error rate overlay</div>
-        <div class="chart" data-chart="err"></div>
-        <div class="legend"><span><i style="background:#C08415"></i>4xx</span><span><i
-              style="background:#C8393F"></i>5xx</span><span><i class="ln" style="background:#8A93E8"></i>Error rate
-            %</span></div>
+        <div class="w-u">Percent · one point per refresh, this browser session only</div>
+        <div class="chart" data-chart="cpu"></div>
+        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>aegis-api-service</span></div>
       </div>
-      <div class="w">
+      <div class="w s2">
         <div class="w-h">
-          <h3>Database health</h3><span class="dots">⋯</span>
+          <h3>Memory utilization</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">aurora-pg-prod writer · percent</div>
-        <div class="chart" data-chart="db"></div>
-        <div class="legend"><span><i class="ln" style="background:#4C5FD5"></i>CPU</span><span><i class="ln"
-              style="background:#17817E"></i>Connections of 400</span></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Database capacity</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Storage and connection headroom</div>
-        <div class="kv"><span class="k">CPU utilization</span><span class="v num">46%</span></div>
-        <div class="kv"><span class="k">Connections</span><span class="v num">312 / 400</span></div>
-        <div class="kv"><span class="k">Free storage</span><span class="v num">312 GiB / 500</span></div>
-        <div class="kv"><span class="k">Replica lag</span><span class="v num">84 ms</span></div>
-        <div class="kv"><span class="k">Deadlocks, 1 h</span><span class="v num">0</span></div>
-        <div class="hr"></div>
-        <div class="w-u m">Connection pool saturation</div>
-        <div class="meter"><i style="width:78%;background:#C08415"></i></div>
-        <div class="foot">78% saturated — alarm threshold is 85%.</div>
+        <div class="w-u">Percent · one point per refresh, this browser session only</div>
+        <div class="chart" data-chart="mem"></div>
+        <div class="legend"><span><i class="ln" style="background:#17817E"></i>aegis-api-service</span></div>
       </div>
     </div>
   </section>
 
-  <!-- ══ 4 · SERVICE HEALTH ══ -->
+  <!-- ══ 3 · SERVICE HEALTH ══ -->
   <section class="sec" id="s-services">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>Service health</h2>
-      <span class="note">ECS services and recent deployments</span>
+      <span class="note">ECS service state, live from GET /status</span>
     </button>
     <div class="body">
-      <div class="w s3 pad0">
+      <div class="w s4 pad0">
         <div class="wt">
-          <h3>Service health table</h3><span class="u">9 services · running and desired tasks</span>
+          <h3>Service health table</h3><span class="u">aegis-cluster</span>
         </div>
-        <div class="tw h280">
+        <div class="tw h200">
           <table>
             <thead>
               <tr>
@@ -1392,9 +1295,6 @@
                 <th>Tasks</th>
                 <th>CPU</th>
                 <th>Memory</th>
-                <th class="r">p95</th>
-                <th class="r">5xx</th>
-                <th>Revision</th>
                 <th>Health</th>
               </tr>
             </thead>
@@ -1402,60 +1302,30 @@
           </table>
         </div>
       </div>
-      <div class="w pad0">
-        <div class="wt">
-          <h3>Deployment events</h3><span class="u">Last 24 h</span>
-        </div>
-        <div class="tw h280">
-          <table>
-            <thead>
-              <tr>
-                <th>Service</th>
-                <th>Revision</th>
-                <th>Time</th>
-                <th>State</th>
-              </tr>
-            </thead>
-            <tbody id="depRows"></tbody>
-          </table>
-        </div>
-      </div>
     </div>
   </section>
 
-  <!-- ══ 5 · INCIDENTS ══ -->
+  <!-- ══ 4 · INCIDENTS ══ -->
   <section class="sec" id="s-incidents">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>Incidents</h2>
-      <span class="note">Detected anomalies, correlation and impact</span>
-      <span class="right"><span class="note">DynamoDB aegis-incidents</span></span>
+      <span class="note">Live from GET /incidents · DynamoDB AegisIncidents</span>
     </button>
     <div class="body">
       <div class="w s4 pad0">
         <div class="wt">
-          <h3>Active incidents</h3><span class="u">Select a row to load details, correlation and evidence</span>
-          <span class="right"><select class="ctl">
-              <option>Open</option>
-              <option>All states</option>
-              <option>Resolved</option>
-            </select><select class="ctl">
-              <option>All severities</option>
-              <option>P1 only</option>
-            </select></span>
+          <h3>Active incidents</h3><span class="u">Select a row to load details and run root-cause analysis</span>
         </div>
         <div class="tw h240">
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Service</th>
                 <th>Anomaly</th>
                 <th>Severity</th>
                 <th>Status</th>
                 <th>Detected</th>
-                <th>Duration</th>
-                <th>Owner</th>
-                <th class="r">Confidence</th>
+                <th class="r">Age</th>
               </tr>
             </thead>
             <tbody id="incRows"></tbody>
@@ -1463,342 +1333,183 @@
         </div>
       </div>
     </div>
-    <div class="sub"><b>INC-2481</b> · payments-api · memory saturation with 5xx surge <span class="sev p1"
-        style="margin-left:6px">P1</span></div>
+    <div class="sub"><b id="selIncId">No incident selected</b><span id="selIncSub"></span></div>
     <div class="body">
       <div class="w">
         <div class="w-h">
           <h3>Incident details</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">GET /incidents/INC-2481</div>
+        <div class="w-u" id="incDetailUrl">GET /incidents/{id}</div>
         <div id="incDetail"></div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Correlation engine</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u">GET /correlation · live multi-signal grouping state</div>
+        <div id="corrBody"></div>
+        <div class="foot">Signals within the correlation window are merged into one incident by correlation.py.</div>
+      </div>
+      <div class="w">
+        <div class="w-h">
+          <h3>Evidence archive</h3><span class="dots">⋯</span>
+        </div>
+        <div class="w-u" id="evidenceUrl">GET /incidents/{id}/evidence</div>
+        <div id="evidenceBody"></div>
       </div>
       <div class="w s2">
         <div class="w-h">
-          <h3>Incident correlation</h3><span class="dots">⋯</span>
+          <h3>Open incidents</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">6 related signals grouped into one incident · minutes from first anomaly</div>
-        <div class="chart" data-chart="corr"></div>
-        <div class="foot">Signals within a 90-second window on services sharing a dependency edge are merged by
-          correlation.py.</div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Notifications and alerts</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">SNS topic aegis-critical</div>
-        <div id="alertBody"></div>
-      </div>
-      <div class="w s3">
-        <div class="w-h">
-          <h3>Dependency graph</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Service call paths · requests per minute and error rate on each edge</div>
-        <div class="chart" data-chart="dep"></div>
-        <div class="legend"><span><i style="background:#C8393F"></i>Failing</span><span><i
-              style="background:#C08415"></i>Degraded</span><span><i style="background:#1E8E5A"></i>Healthy</span></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Human escalation</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Incidents awaiting an operator</div>
+        <div class="w-u">Every OPEN incident currently in the store</div>
         <div id="escBody"></div>
       </div>
     </div>
   </section>
 
-  <!-- ══ 6 · ROOT CAUSE ══ -->
+  <!-- ══ 5 · ROOT CAUSE ══ -->
   <section class="sec" id="s-rca">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>Root cause analysis</h2>
-      <span class="note">rca.py and ai_reasoning.py for INC-2481</span>
-      <span class="right"><button class="ctl">Re-run</button></span>
+      <span class="note">rca.py + ai_reasoning.py, run live for the selected incident</span>
+      <span class="right"><button class="ctl" id="rerunRca">Re-run</button></span>
     </button>
     <div class="body">
       <div class="w s2">
         <div class="w-h">
           <h3>Probable root cause</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Candidates ranked by weighted evidence score</div>
-        <div class="note-b" style="margin-bottom:11px"><b>Memory leak introduced by payments-api v2.14.3.</b> Heap grows
-          41 MiB/hour with no reclamation after GC. Tasks reach the 2 GiB limit around 3.5 hours after each deploy and
-          are OOM-killed, producing 502s at the load balancer.</div>
-        <div class="chart" data-chart="rcaRank"></div>
-        <div class="foot">Score = metric correlation (0.5) + log signature match (0.3) + change proximity (0.2).</div>
+        <div class="w-u">POST /reason response for the selected incident</div>
+        <div class="note-b" id="rcaSummary" style="margin-bottom:11px">Select an incident above to run analysis.</div>
+        <div id="rcaEvidence"></div>
       </div>
       <div class="w">
         <div class="w-h">
           <h3>Confidence score</h3><span class="dots">⋯</span>
         </div>
         <div class="w-u">RCA confidence · POST /reason</div>
-        <div class="kv-big" style="color:#3F4FBF">91<s>%</s></div>
+        <div class="kv-big" style="color:#3F4FBF" id="rcaConfidence">—</div>
         <div class="gauge" id="gauge"></div>
-        <div class="delta fl">Above the 85% autonomous-action threshold</div>
-        <div class="hr"></div>
-        <div class="kv"><span class="k">Metric correlation</span><span class="v num">0.94</span></div>
-        <div class="kv"><span class="k">Log signature match</span><span class="v num">0.89</span></div>
-        <div class="kv"><span class="k">Change proximity</span><span class="v num">0.86</span></div>
-        <div class="kv"><span class="k">Historical precedent</span><span class="v num">4 matches</span></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Evidence</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Metrics, logs, events and changes attached to the incident</div>
-        <div class="kv"><span class="k">Log signature</span><span class="v mono"
-            style="font-size:10.5px">OutOfMemoryError ×47</span></div>
-        <div class="kv"><span class="k">Change event</span><span class="v mono" style="font-size:10.5px">deploy v2.14.3
-            · 08:12</span></div>
-        <div class="kv"><span class="k">Trace exemplars</span><span class="v">12 spans &gt; 4 s</span></div>
-        <div class="kv"><span class="k">Metric artefacts</span><span class="v num">6</span></div>
-        <div class="kv"><span class="k">Ruled out</span><span class="v">RDS, upstream 429s</span></div>
-        <div class="hr"></div>
-        <div class="w-u m">Heap after GC · MiB per task</div>
-        <div class="chart" data-chart="heap"></div>
+        <div class="delta fl" id="rcaThresholdNote">Waiting for analysis</div>
       </div>
       <div class="w s2">
         <div class="w-h">
           <h3>AI reasoning</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Explanation and diagnosis recorded verbatim in the audit log</div>
+        <div class="w-u">Summary, impact and recommended action from ai_reasoning.py</div>
         <div id="reasonSteps"></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>OOM kills and restarts</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Count per hour · payments-api</div>
-        <div class="chart" data-chart="oom"></div>
-        <div class="foot">Kills begin 3 h 40 m after the v2.14.3 rollout completed.</div>
       </div>
       <div class="w">
         <div class="w-h">
           <h3>Reasoning run</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">POST /reason · ai_reasoning.py</div>
-        <div class="kv"><span class="k">Run ID</span><span class="v mono">rsn-8841</span></div>
-        <div class="kv"><span class="k">Evidence tokens</span><span class="v num">18,402</span></div>
-        <div class="kv"><span class="k">Latency</span><span class="v num">6.4 s</span></div>
-        <div class="kv"><span class="k">Candidates weighed</span><span class="v num">5</span></div>
-        <div class="kv"><span class="k">Diagnosis</span><span class="v">Rollback recommended</span></div>
-        <div class="hr"></div>
-        <div class="note-b">Operator review is open. Accepting or disputing this diagnosis updates RCA accuracy.</div>
+        <div class="w-u">POST /reason</div>
+        <div class="kv"><span class="k">Incident</span><span class="v mono" id="rcaRunId">—</span></div>
+        <div class="kv"><span class="k">Round-trip latency</span><span class="v num" id="rcaLatency">—</span></div>
+        <div class="kv"><span class="k">Diagnosis</span><span class="v" id="rcaDiagnosis">—</span></div>
       </div>
     </div>
   </section>
 
-  <!-- ══ 7 · SAFETY & POLICY ══ -->
+  <!-- ══ 6 · SAFETY & POLICY ══ -->
   <section class="sec" id="s-safety">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>Safety and policy</h2>
-      <span class="note">policy.py evaluation before any remediation</span>
-      <span class="right"><span class="tag warn">Human review required</span></span>
+      <span class="note">policy.py guardrails, live from GET /policy</span>
     </button>
     <div class="body">
       <div class="w">
         <div class="w-h">
-          <h3>Safety evaluation</h3><span class="dots">⋯</span>
+          <h3>Active guardrails</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">GET /policy · risk, blast radius, policy</div>
-        <div class="kv"><span class="k">Risk score</span><span class="v"><span class="tag warn">Medium ·
-              0.46</span></span></div>
-        <div class="kv"><span class="k">Blast radius</span><span class="v">3 of 9 services</span></div>
-        <div class="kv"><span class="k">Traffic affected</span><span class="v num">18.4%</span></div>
-        <div class="kv"><span class="k">Reversible</span><span class="v">Yes · 90 s</span></div>
-        <div class="kv"><span class="k">Change freeze</span><span class="v">Not active</span></div>
-        <div class="kv"><span class="k">Policy version</span><span class="v mono"
-            style="font-size:10.5px">2026-09-04.2</span></div>
+        <div class="w-u">GET /policy · enforced before every remediation</div>
+        <div class="kv"><span class="k">Minimum RCA confidence</span><span class="v num" id="polConfidence">—</span></div>
+        <div class="kv"><span class="k">Max desired task count</span><span class="v num" id="polMaxDesired">—</span></div>
+        <div class="kv"><span class="k">Cooldown between actions</span><span class="v num" id="polCooldown">—</span></div>
+        <div class="kv"><span class="k">Critical-only autonomy</span><span class="v" id="polCriticalOnly">—</span></div>
+        <div class="kv"><span class="k">Allowed actions</span><span class="v" id="polActions">—</span></div>
       </div>
-      <div class="w">
+      <div class="w s3">
         <div class="w-h">
-          <h3>Blast radius by service</h3><span class="dots">⋯</span>
+          <h3>How the gate decides</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">Share of each service affected by the proposed action</div>
-        <div class="chart" data-chart="blast"></div>
-        <div class="foot">Six remaining services have no call path to the target.</div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Decision status</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">/policy → /remediate</div>
-        <div style="display:flex;align-items:center;gap:9px;margin:6px 0 9px"><span class="dot warn"
-            style="width:10px;height:10px;flex-basis:10px"></span><b style="font-size:17px;font-weight:600">Human
-            review</b></div>
-        <div class="kv"><span class="k">Verdict</span><span class="v">Allowed with approval</span></div>
-        <div class="kv"><span class="k">Rule triggered</span><span class="v mono"
-            style="font-size:10.5px">tier0-rollback-gate</span></div>
-        <div class="kv"><span class="k">Confidence gate</span><span class="v">91% ≥ 85% ✓</span></div>
-        <div class="kv"><span class="k">Rate limit</span><span class="v num">2 of 5 this hour</span></div>
-        <div class="kv"><span class="k">Requested</span><span class="v num">12:09:02</span></div>
-        <div class="hr"></div>
-        <div style="display:flex;gap:7px"><button class="ctl pri">Approve</button><button class="ctl">Block</button>
-        </div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Policy status</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Active safety limits · policy set prod-strict</div>
-        <div class="kv"><span class="k">Autonomy level</span><span class="v">Guarded</span></div>
-        <div class="kv"><span class="k">Max blast radius</span><span class="v num">25% of traffic</span></div>
-        <div class="kv"><span class="k">Action rate limit</span><span class="v num">5 per hour</span></div>
-        <div class="kv"><span class="k">Confidence threshold</span><span class="v num">85%</span></div>
-        <div class="kv"><span class="k">Tier-0 services</span><span class="v">payments-api, auth-svc</span></div>
-        <div class="kv"><span class="k">Rollback window</span><span class="v num">4 revisions</span></div>
+        <div class="w-u">policy.py logic, not per-incident numbers</div>
+        <div class="note-b">An action executes automatically only when the incident severity is CRITICAL, RCA
+          confidence is at or above the minimum above, the current desired task count is below the max, and the
+          cooldown window has elapsed since the last autonomous action. If any condition fails, the action is
+          blocked and the incident is left for human review — this is the same gate every chaos scenario in this
+          dashboard runs through.</div>
       </div>
     </div>
   </section>
 
-  <!-- ══ 8 · RECOVERY ══ -->
+  <!-- ══ 7 · RECOVERY ══ -->
   <section class="sec" id="s-recovery">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>Recovery</h2>
-      <span class="note">Proposed action through to verified outcome</span>
-      <span class="right"><span class="note">Step Functions aegis-recovery</span></span>
+      <span class="note">Step Functions workflow config and real recovery attempts</span>
     </button>
     <div class="body">
       <div class="w">
         <div class="w-h">
-          <h3>Proposed recovery action</h3><span class="dots">⋯</span>
+          <h3>Recovery engine</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">POST /remediate · remediation.py</div>
-        <div class="note-b" style="margin:4px 0 10px"><b>Roll back payments-api to v2.14.2</b>, then scale from 6 to 8
-          tasks for 30 minutes to absorb the retry backlog.</div>
-        <div class="kv"><span class="k">Action type</span><span class="v">Rollback + scale</span></div>
-        <div class="kv"><span class="k">Alternatives</span><span class="v">Restart, raise memory limit</span></div>
-        <div class="kv"><span class="k">Estimated recovery</span><span class="v num">3 m 40 s</span></div>
+        <div class="w-u">GET /workflow · Step Functions integration</div>
+        <div class="kv"><span class="k">State machine</span><span class="v mono" style="font-size:10.5px" id="wfName">—</span></div>
+        <div class="kv"><span class="k">Status</span><span class="v" id="wfStatus">—</span></div>
+        <div class="kv"><span class="k">Supported actions</span><span class="v" id="wfActions">—</span></div>
       </div>
       <div class="w">
         <div class="w-h">
-          <h3>Recovery execution status</h3><span class="dots">⋯</span>
+          <h3>Recovery outcomes</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">/workflow · execution aegis-recover-2481</div>
-        <div style="display:flex;align-items:center;gap:9px;margin:6px 0 9px"><span class="dot warn"
-            style="width:10px;height:10px;flex-basis:10px"></span><b style="font-size:17px;font-weight:600">Running</b>
-        </div>
-        <div class="kv"><span class="k">Step</span><span class="v num">4 of 6</span></div>
-        <div class="kv"><span class="k">Started</span><span class="v num">12:09:11</span></div>
-        <div class="kv"><span class="k">Elapsed</span><span class="v num">2 m 48 s</span></div>
-        <div class="kv"><span class="k">Retries</span><span class="v num">0</span></div>
-        <div class="kv"><span class="k">Pending / completed / failed</span><span class="v num">2 / 4 / 0</span></div>
+        <div class="w-u">All recorded chaos/recovery attempts</div>
+        <div class="chart" data-chart="outcome"></div>
       </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Execution progress</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Current operation · seconds per step</div>
-        <div class="meter" style="margin:4px 0 6px"><i style="width:62%"></i></div>
-        <div class="foot" style="margin:0 0 10px">Rolling deployment: 5 of 8 tasks now on v2.14.2.</div>
-        <div class="chart" data-chart="steps"></div>
-      </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Recovery verification</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">POST /verify-recovery · target health after remediation</div>
-        <div class="kv"><span class="k">Healthy tasks</span><span class="v num">8 / 8 <span class="tag ok"
-              style="margin-left:5px">Met</span></span></div>
-        <div class="kv"><span class="k">CPU</span><span class="v num">34% <span style="color:var(--tx3)">base
-              31%</span></span></div>
-        <div class="kv"><span class="k">p95 latency</span><span class="v num">212 ms <span style="color:var(--tx3)">base
-              198</span></span></div>
-        <div class="kv"><span class="k">5xx rate</span><span class="v num">0.04% <span style="color:var(--tx3)">SLO
-              0.5%</span></span></div>
-        <div class="kv"><span class="k">Sample window</span><span class="v num">5 min</span></div>
-        <div class="hr"></div>
-        <div class="foot">Verification passes when all four targets hold for the full window.</div>
-      </div>
-      <div class="w s2">
-        <div class="w-h">
-          <h3>Autonomous recovery workflow</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Detection → RCA → safety → recovery → verification</div>
-        <div id="wfSteps"></div>
-      </div>
-      <div class="w s2">
-        <div class="w-h">
-          <h3>Before and after recovery</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">15 minutes before remediation against 15 minutes after verification</div>
-        <div class="chart" data-chart="ba"></div>
-        <div class="legend"><span><i style="background:#98A0AB"></i>Before</span><span><i
-              style="background:#4C5FD5"></i>After</span></div>
-      </div>
-      <div class="w s3 pad0">
+      <div class="w s2 pad0">
         <div class="wt">
-          <h3>Recovery history</h3><span class="u">Restart, scale and rollback actions · last 7 days</span>
+          <h3>Recovery history</h3><span class="u">GET /chaos/history · every scenario run through the real pipeline</span>
         </div>
         <div class="tw h240">
           <table>
             <thead>
               <tr>
                 <th>Time</th>
-                <th>Incident</th>
-                <th>Service</th>
-                <th>Action</th>
-                <th>Decided by</th>
-                <th class="r">Duration</th>
-                <th>Result</th>
+                <th>Scenario</th>
+                <th>Status</th>
+                <th>Recovery verified</th>
               </tr>
             </thead>
             <tbody id="recRows"></tbody>
           </table>
         </div>
       </div>
-      <div class="w">
-        <div class="w-h">
-          <h3>Recovery outcomes</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">69 attempts · last 7 days</div>
-        <div class="chart" data-chart="outcome"></div>
-      </div>
     </div>
   </section>
 
-  <!-- ══ 9 · CHAOS ══ -->
+  <!-- ══ 8 · CHAOS ══ -->
   <section class="sec" id="s-chaos">
     <button class="sec-h" aria-expanded="true"><i class="chev"></i>
       <h2>Chaos engineering</h2>
-      <span class="note">Fault injection against ECS · chaos.py</span>
-      <span class="right"><span class="tag ok">Safeguards active</span></span>
+      <span class="note">Real fault injection against aegis-api-service · chaos.py</span>
+      <span class="right"><span class="tag ok">Policy-gated</span></span>
     </button>
     <div class="body">
-      <div class="w">
+      <div class="w s2">
         <div class="w-h">
           <h3>Chaos control panel</h3><span class="dots">⋯</span>
         </div>
-        <div class="w-u">/chaos/* · target and duration apply to all experiments</div>
-        <div style="display:flex;gap:7px;margin-bottom:10px">
-          <select class="ctl" style="flex:1">
-            <option>payments-api</option>
-            <option>orders-svc</option>
-            <option>checkout-web</option>
-            <option>ledger-worker</option>
-          </select>
-          <select class="ctl">
-            <option>2 min</option>
-            <option>5 min</option>
-            <option>10 min</option>
-          </select>
-        </div>
-        <div style="display:grid;gap:6px">
-          <button class="chaos" disabled><span><b>CPU spike</b><span>Pin 2 vCPU to 95% on one task</span></span><span
-              class="tag">Blocked</span></button>
-          <button class="chaos" disabled><span><b>Memory pressure</b><span>Allocate 1.6 GiB of the 2 GiB
-                limit</span></span><span class="tag">Blocked</span></button>
-          <button class="chaos" disabled><span><b>Task failure</b><span>Terminate one task without
-                draining</span></span><span class="tag">Blocked</span></button>
-        </div>
-        <div class="foot">Injection is blocked on payments-api while a P1 incident is open. Choose another target to
-          enable.</div>
+        <div class="w-u">POST /chaos/* · target is always aegis-api-service</div>
+        <label style="display:flex;align-items:center;gap:7px;margin-bottom:10px;font-size:11.5px;color:var(--tx2)">
+          <input type="checkbox" id="dryRunChk"> Dry run (evaluate policy, skip Step Functions execution)
+        </label>
+        <div id="chaosButtons" style="display:grid;gap:6px"></div>
+        <div class="foot" id="chaosFoot">Every run goes through detection → RCA → policy → (recovery). Some
+          scenarios are designed to be blocked by policy — that's expected, not a failure.</div>
       </div>
-      <div class="w s3 pad0">
+      <div class="w s2 pad0">
         <div class="wt">
-          <h3>Chaos history</h3><span class="u">GET /chaos/history · previous experiments</span>
-          <span class="right"><span class="note" style="font-size:11px;color:var(--tx3)">18 runs this
-              month</span></span>
+          <h3>Chaos history</h3><span class="u">GET /chaos/history · shared across all API replicas</span>
         </div>
         <div class="tw h240">
           <table>
@@ -1806,11 +1517,8 @@
               <tr>
                 <th>Started</th>
                 <th>Experiment</th>
-                <th>Target</th>
-                <th>Duration</th>
-                <th class="r">Detected in</th>
-                <th class="r">Recovered in</th>
                 <th>Outcome</th>
+                <th class="r">Recovery verified</th>
               </tr>
             </thead>
             <tbody id="chaosRows"></tbody>
@@ -1820,107 +1528,18 @@
     </div>
   </section>
 
-  <!-- ══ 10 · LOGS, AUDIT & SYSTEM ══ -->
-  <section class="sec" id="s-logs">
-    <button class="sec-h" aria-expanded="true"><i class="chev"></i>
-      <h2>Logs, audit and workflow</h2>
-      <span class="note">CloudWatch Logs, audit.log and Step Functions state</span>
-    </button>
-    <div class="body">
-      <div class="w s2 pad0">
-        <div class="wt">
-          <h3>Application logs</h3><span class="u">Exceptions and errors with timestamps</span>
-          <span class="right"><span class="seg" id="logSeg"><button class="on" data-lv="all">All</button><button
-                data-lv="ERROR">Errors</button><button data-lv="WARN">Warnings</button></span></span>
-        </div>
-        <div class="logs h280" id="logBody"></div>
-      </div>
-      <div class="w s2 pad0">
-        <div class="wt">
-          <h3>Audit trail</h3><span class="u">Incident → root cause → action → result</span>
-          <span class="right"><span class="tag ok">14/14 fields</span></span>
-        </div>
-        <div class="tw h280">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Incident</th>
-                <th>Root cause</th>
-                <th>Action</th>
-                <th>Decided by</th>
-                <th>Result</th>
-              </tr>
-            </thead>
-            <tbody id="auditRows"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="w s2">
-        <div class="w-h">
-          <h3>Workflow status</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">GET /workflow · Step Functions integration state</div>
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px">
-          <div>
-            <div class="kv"><span class="k">Integration</span><span class="v"><span
-                  class="tag ok">Connected</span></span></div>
-            <div class="kv"><span class="k">State machine</span><span class="v mono"
-                style="font-size:10.5px">aegis-recovery v4</span></div>
-            <div class="kv"><span class="k">Median duration</span><span class="v num">3 m 52 s</span></div>
-            <div class="kv"><span class="k">Throttles, 24 h</span><span class="v num">0</span></div>
-          </div>
-          <div>
-            <div class="w-u m">Executions by state, last 24 h</div>
-            <div class="chart" data-chart="wf"></div>
-          </div>
-        </div>
-      </div>
-      <div class="w s2">
-        <div class="w-h">
-          <h3>Supervisor loop duration</h3><span class="dots">⋯</span>
-        </div>
-        <div class="w-u">Milliseconds per detection cycle · budget 500 ms</div>
-        <div class="chart" data-chart="loop"></div>
-        <div class="foot">The rise at 12:04 is the detection cycle that opened INC-2481.</div>
-      </div>
-    </div>
-  </section>
-
   <div id="tip" role="status" aria-live="polite"></div>
 
   <script>
     (function () {
       "use strict";
+      var BASE = "http://AegisI-Aegis-9T1qlmEvlgUH-464819824.ap-south-1.elb.amazonaws.com";
       var C = {
         iris: "#4C5FD5", iris2: "#8A93E8", teal: "#17817E", grey: "#98A0AB", ok: "#1E8E5A", warn: "#C08415", crit: "#C8393F", info: "#2F6FD0",
         line: "#E1E4E9", hair: "#EDEEF2", tx3: "#8B9098", tx2: "#5B6069"
       };
       var tip = document.getElementById("tip");
       function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
-
-      /* ── data ── */
-      function rng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
-      function series(n, o) {
-        var r = rng(o.seed || 7), out = [], v = o.base, i, y;
-        for (i = 0; i < n; i++) { v += (o.base - v) * 0.18 + (r() - 0.5) * o.noise; y = v; if (o.event) y = o.event(i / (n - 1), y); out.push(Math.max(0, y)); }
-        return out;
-      }
-      var S = 0.60, P = 0.80, E = 0.90;
-      function ramp(t, a, b) { return t < a ? 0 : t > b ? 1 : (t - a) / (b - a); }
-      function bump(t, a, p, e, h) { if (t < a || t > e) return 0; return t < p ? h * ramp(t, a, p) : h * (1 - ramp(t, p, e)); }
-      var RANGES = { "1h": { n: 60, step: 1 }, "3h": { n: 72, step: 2.5 }, "12h": { n: 72, step: 10 }, "1d": { n: 96, step: 15 }, "3d": { n: 72, step: 60 }, "1w": { n: 84, step: 120 } };
-      var range = "12h";
-      function N() { return RANGES[range].n; }
-      function labels() {
-        var R = RANGES[range], o = [], end = new Date(2026, 8, 19, 12, 44, 0), i, d;
-        for (i = R.n - 1; i >= 0; i--) {
-          d = new Date(end.getTime() - i * R.step * 60000);
-          o.push(R.step >= 60 ? (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] + " " + String(d.getHours()).padStart(2, "0") + ":00")
-            : (String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")));
-        }
-        return o;
-      }
 
       /* ── engine ── */
       function nice(v) { var p = Math.pow(10, Math.floor(Math.log10(v || 1))), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; }
@@ -1978,70 +1597,6 @@
         });
         hit.addEventListener("mouseleave", function () { hv.setAttribute("opacity", "0"); tip.style.opacity = "0"; });
       }
-      function barChart(node, cfg) {
-        var W = Math.max(node.clientWidth || 360, 200), H = cfg.height || 146;
-        var pl = cfg.padLeft === undefined ? 30 : cfg.padLeft, pr = 8, pt = 8, pb = cfg.cats ? 20 : 6;
-        var n = cfg.series[0].data.length, pw = W - pl - pr, ph = H - pt - pb, i, k;
-        var tot = cfg.series[0].data.map(function (_, i) { return cfg.stack ? cfg.series.reduce(function (a, s) { return a + s.data[i]; }, 0) : Math.max.apply(null, cfg.series.map(function (s) { return s.data[i]; })); });
-        var max = nice(Math.max.apply(null, tot) * 1.15);
-        var slot = pw / n, bw = cfg.stack ? Math.min(slot * 0.6, 20) : Math.min(slot * 0.7 / cfg.series.length, 16);
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(cfg.aria || "bar chart") + '">';
-        for (k = 0; k <= 3; k++) {
-          var ty = pt + ph - ph * k / 3;
-          svg += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + ty + '" y2="' + ty + '" stroke="' + (k === 0 ? C.line : C.hair) + '"/>';
-          svg += '<text x="' + (pl - 6) + '" y="' + (ty + 3.4) + '" text-anchor="end" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">' + (cfg.fmtY ? cfg.fmtY(max * k / 3) : Math.round(max * k / 3)) + '</text>';
-        }
-        for (i = 0; i < n; i++) {
-          var cx = pl + slot * i + slot / 2, acc = 0;
-          cfg.series.forEach(function (s, si) {
-            var v = s.data[i], h = v / max * ph;
-            var bx = cfg.stack ? cx - bw / 2 : cx - (bw * cfg.series.length) / 2 + si * bw;
-            var by = cfg.stack ? (pt + ph - acc - h) : (pt + ph - h);
-            svg += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + (cfg.stack ? bw : bw - 2).toFixed(1) + '" height="' + Math.max(h, .8).toFixed(1) + '" fill="' + s.color + '"/>'; acc += h;
-          });
-        }
-        if (cfg.line) {
-          var lm = cfg.line.max || nice(Math.max.apply(null, cfg.line.data) * 1.3);
-          svg += '<path d="' + pth(cfg.line.data.map(function (v, i) { return [pl + slot * i + slot / 2, pt + ph - v / lm * ph]; })) + '" fill="none" stroke="' + cfg.line.color + '" stroke-width="1.4"/>';
-        }
-        if (cfg.cats) {
-          var ev = Math.ceil(n / (W > 420 ? 7 : 4));
-          for (i = 0; i < n; i += ev)svg += '<text x="' + (pl + slot * i + slot / 2) + '" y="' + (H - 5) + '" text-anchor="middle" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">' + esc(cfg.cats[i]) + '</text>';
-        }
-        svg += '<g class="hv" opacity="0"><line y1="' + pt + '" y2="' + (pt + ph) + '" stroke="' + C.tx3 + '" opacity=".5"/>';
-        cfg.series.forEach(function () { svg += '<circle r="0"/>'; });
-        svg += '</g><rect class="hit" x="' + pl + '" y="' + pt + '" width="' + pw + '" height="' + ph + '" fill="transparent"/></svg>';
-        node.innerHTML = svg;
-        hover(node, { labels: cfg.cats, fmtV: cfg.fmtV, series: cfg.line ? cfg.series.concat([{ name: cfg.line.name, data: cfg.line.data, color: cfg.line.color }]) : cfg.series },
-          n, function (i) { return pl + slot * i + slot / 2; }, function () { return -30; }, pl, pw);
-      }
-      function hBars(node, cfg) {
-        var W = Math.max(node.clientWidth || 260, 180), rowH = cfg.rowH || 22, lw = cfg.labelW || 96;
-        var H = cfg.rows.length * rowH + 4, max = cfg.max || Math.max.apply(null, cfg.rows.map(function (r) { return r.v; })) * 1.1;
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(cfg.aria || "comparison") + '">';
-        cfg.rows.forEach(function (r, i) {
-          var yy = i * rowH + 3, bw = (W - lw - 42) * r.v / max;
-          svg += '<text x="0" y="' + (yy + 10) + '" fill="' + C.tx2 + '" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + esc(r.k) + '</text>';
-          svg += '<rect x="' + lw + '" y="' + yy + '" width="' + (W - lw - 42) + '" height="12" fill="#EDEEF2"/>';
-          svg += '<rect x="' + lw + '" y="' + yy + '" width="' + Math.max(bw, 1.2).toFixed(1) + '" height="12" fill="' + (r.color || C.iris) + '"/>';
-          svg += '<text x="' + W + '" y="' + (yy + 10) + '" text-anchor="end" fill="' + C.tx2 + '" font-size="10" font-family="IBM Plex Mono,monospace">' + esc(r.label) + '</text>';
-        });
-        node.innerHTML = svg + '</svg>';
-      }
-      function grouped(node, rows) {
-        var W = Math.max(node.clientWidth || 300, 220), rowH = 36, H = rows.length * rowH + 4;
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="before and after recovery">';
-        rows.forEach(function (r, i) {
-          var yy = i * rowH + 2, max = Math.max(r.a, r.b) * 1.28, aw = (W - 128) * r.a / max, bw = (W - 128) * r.b / max;
-          svg += '<text x="0" y="' + (yy + 9) + '" fill="' + C.tx2 + '" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + esc(r.k) + '</text>';
-          svg += '<rect x="112" y="' + (yy + 1) + '" width="' + Math.max(aw, 1.2).toFixed(1) + '" height="9" fill="' + C.grey + '"/>';
-          svg += '<text x="' + W + '" y="' + (yy + 9) + '" text-anchor="end" fill="' + C.tx3 + '" font-size="10" font-family="IBM Plex Mono,monospace">' + esc(r.al) + '</text>';
-          svg += '<rect x="112" y="' + (yy + 14) + '" width="' + Math.max(bw, 1.2).toFixed(1) + '" height="9" fill="' + C.iris + '"/>';
-          svg += '<text x="' + W + '" y="' + (yy + 22) + '" text-anchor="end" fill="' + C.tx2 + '" font-size="10" font-family="IBM Plex Mono,monospace">' + esc(r.bl) + '</text>';
-          if (i < rows.length - 1) svg += '<line x1="0" x2="' + W + '" y1="' + (yy + 30) + '" y2="' + (yy + 30) + '" stroke="' + C.hair + '"/>';
-        });
-        node.innerHTML = svg + '</svg>';
-      }
       function donut(node, cfg) {
         var W = Math.max(node.clientWidth || 240, 190), H = 150, cx = Math.min(W * 0.28, 74), cy = H / 2, r = 54, ir = 34;
         var tot = cfg.slices.reduce(function (a, s) { return a + s.v; }, 0), ang = -Math.PI / 2;
@@ -2063,344 +1618,395 @@
         node.innerHTML = svg + '</svg>';
       }
       function spark(node, cfg) {
-        var W = Math.max(node.clientWidth || 110, 60), H = 22, n = cfg.data.length;
-        var mx = Math.max.apply(null, cfg.data), mn = Math.min.apply(null, cfg.data), sp = (mx - mn) || 1;
-        var pts = cfg.data.map(function (v, i) { return [W * i / (n - 1), H - 2 - (v - mn) / sp * (H - 6)]; });
+        var W = Math.max(node.clientWidth || 110, 60), H = 22, data = cfg.data.length > 1 ? cfg.data : [cfg.data[0], cfg.data[0]];
+        var n = data.length;
+        var mx = Math.max.apply(null, data), mn = Math.min.apply(null, data), sp = (mx - mn) || 1;
+        var pts = data.map(function (v, i) { return [W * i / (n - 1), H - 2 - (v - mn) / sp * (H - 6)]; });
         node.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><path d="' + pth(pts) + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="' + cfg.color + '" opacity=".10"/><path d="' + pth(pts) + '" fill="none" stroke="' + cfg.color + '" stroke-width="1.2"/><circle cx="' + pts[n - 1][0] + '" cy="' + pts[n - 1][1] + '" r="1.9" fill="' + cfg.color + '"/></svg>';
       }
-      function depGraph(node) {
-        var W = Math.max(node.clientWidth || 620, 340), H = 216;
-        var ns = [{ id: "alb", k: "ALB", x: .06, y: .5, s: "warn", m: "18.4k rpm" },
-        { id: "web", k: "checkout-web", x: .29, y: .18, s: "ok", m: "6 tasks" },
-        { id: "pay", k: "payments-api", x: .29, y: .8, s: "crit", m: "5/8 tasks" },
-        { id: "ord", k: "orders-svc", x: .57, y: .18, s: "warn", m: "4 tasks" },
-        { id: "auth", k: "auth-svc", x: .57, y: .8, s: "ok", m: "3 tasks" },
-        { id: "rds", k: "aurora-pg", x: .85, y: .46, s: "ok", m: "CPU 46%" },
-        { id: "sqs", k: "ledger-queue", x: .85, y: .88, s: "warn", m: "2.1k depth" }];
-        var es = [["alb", "web", "9.2k · 0.1%", "ok"], ["alb", "pay", "9.2k · 6.4%", "crit"], ["web", "ord", "4.1k · 0.3%", "ok"],
-        ["pay", "auth", "8.8k · 0.2%", "ok"], ["pay", "rds", "7.4k · 1.9%", "warn"], ["ord", "rds", "3.9k · 0.1%", "ok"], ["pay", "sqs", "2.2k · 4.1%", "crit"]];
-        var m = {}; ns.forEach(function (n) { m[n.id] = { x: n.x * W, y: 28 + n.y * (H - 58) }; });
-        var col = { ok: C.ok, warn: C.warn, crit: C.crit };
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="service dependency graph">';
-        es.forEach(function (e) {
-          var a = m[e[0]], b = m[e[1]];
-          svg += '<path d="M' + a.x + ' ' + a.y + ' C ' + (a.x + 48) + ' ' + a.y + ', ' + (b.x - 48) + ' ' + b.y + ', ' + b.x + ' ' + b.y + '" fill="none" stroke="' + col[e[3]] + '" stroke-width="' + (e[3] === "crit" ? 1.7 : 1.1) + '" opacity="' + (e[3] === "ok" ? .28 : .7) + '"/>';
-          svg += '<text x="' + ((a.x + b.x) / 2) + '" y="' + ((a.y + b.y) / 2 - 5) + '" text-anchor="middle" fill="' + (e[3] === "ok" ? C.tx3 : C.tx2) + '" font-size="9" font-family="IBM Plex Mono,monospace">' + e[2] + '</text>';
-        });
-        ns.forEach(function (n) {
-          var p = m[n.id], w = n.k.length * 6.2 + 24;
-          svg += '<rect x="' + (p.x - w / 2) + '" y="' + (p.y - 15) + '" width="' + w + '" height="30" rx="2" fill="#FFFFFF" stroke="' + (n.s === "ok" ? C.line : col[n.s]) + '"/>';
-          svg += '<circle cx="' + (p.x - w / 2 + 10) + '" cy="' + (p.y - 4) + '" r="3" fill="' + col[n.s] + '"/>';
-          svg += '<text x="' + (p.x - w / 2 + 18) + '" y="' + (p.y - 1) + '" fill="#1B1D22" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + n.k + '</text>';
-          svg += '<text x="' + (p.x - w / 2 + 18) + '" y="' + (p.y + 10) + '" fill="' + C.tx3 + '" font-size="9" font-family="IBM Plex Mono,monospace">' + n.m + '</text>';
-        });
-        node.innerHTML = svg + '</svg>';
+
+      /* ── live data client ── */
+      var POLL_MAX_POINTS = 40;
+      var cpuBuf = [], memBuf = [];
+      var allIncidents = [];
+      var selectedIncidentId = null;
+      var latestPolicy = null;
+      var pollTimer = null;
+
+      var CHAOS_SCENARIOS = [
+        { slug: "cpu-spike", label: "CPU spike", desc: "Simulate 95% CPU on aegis-api-service" },
+        { slug: "task-failure", label: "Task failure", desc: "Simulate a crashed ECS task" },
+        { slug: "memory-pressure", label: "Memory pressure", desc: "Simulate high memory utilization" },
+        { slug: "multi-signal", label: "Multi-signal incident", desc: "Correlate CPU + memory into one incident" },
+        { slug: "latency-spike", label: "Latency spike", desc: "Simulate a 3,500 ms p99 latency spike" },
+        { slug: "error-rate-spike", label: "Error rate spike", desc: "Simulate a 25% HTTP 5xx rate" },
+        { slug: "db-connectivity-failure", label: "DB connectivity failure", desc: "Expected to escalate, not auto-remediate" },
+        { slug: "bad-deployment", label: "Bad deployment", desc: "Simulate an error spike after a deploy" },
+        { slug: "low-confidence", label: "Low-confidence incident", desc: "Expected to be blocked by the confidence gate" },
+        { slug: "normal-workload", label: "Normal workload", desc: "Healthy metrics — confirms no false positive" }
+      ];
+
+      function fmtTime(iso) { try { return new Date(iso).toLocaleTimeString(); } catch (e) { return iso || "—"; } }
+      function ago(iso) {
+        var t = Date.parse(iso); if (isNaN(t)) return "—";
+        var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+        if (s < 60) return s + "s";
+        var m = Math.floor(s / 60); if (m < 60) return m + "m";
+        var h = Math.floor(m / 60); if (h < 24) return h + "h " + (m % 60) + "m";
+        var d = Math.floor(h / 24); return d + "d " + (h % 24) + "h";
       }
-      function corr(node) {
-        var W = Math.max(node.clientWidth || 480, 300);
-        var rows = [{ k: "Memory above 90%", a: 0, b: .18, c: C.crit }, { k: "OOM task kill", a: .16, b: .26, c: C.crit },
-        { k: "5xx rate above 2%", a: .2, b: .62, c: C.crit }, { k: "p99 latency above 3 s", a: .22, b: .66, c: C.warn },
-        { k: "Target group unhealthy", a: .3, b: .55, c: C.warn }, { k: "Ledger queue depth rising", a: .38, b: .74, c: C.warn }];
-        var rowH = 23, H = rows.length * rowH + 18, lw = 134, g;
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="correlated signal timeline">';
-        for (g = 0; g <= 4; g++) {
-          var gx = lw + (W - lw - 6) * g / 4;
-          svg += '<line x1="' + gx + '" x2="' + gx + '" y1="0" y2="' + (H - 16) + '" stroke="' + C.hair + '"/>';
-          svg += '<text x="' + gx + '" y="' + (H - 4) + '" text-anchor="middle" fill="' + C.tx3 + '" font-size="9.5" font-family="IBM Plex Mono,monospace">+' + (g * 4) + 'm</text>';
-        }
-        rows.forEach(function (r, i) {
-          var yy = i * rowH + 6, x1 = lw + (W - lw - 6) * r.a, x2 = lw + (W - lw - 6) * r.b;
-          svg += '<text x="0" y="' + (yy + 10) + '" fill="' + C.tx2 + '" font-size="10.5" font-family="IBM Plex Sans,sans-serif">' + r.k + '</text>';
-          svg += '<rect x="' + x1 + '" y="' + yy + '" width="' + Math.max(x2 - x1, 3) + '" height="11" rx="1" fill="' + r.c + '" opacity=".72"/>';
-        });
-        node.innerHTML = svg + '</svg>';
+      function sevClass(sev) { sev = (sev || "").toUpperCase(); return sev === "CRITICAL" ? "p1" : sev === "HIGH" ? "p2" : "p3"; }
+      function statusTag(status) { status = (status || "").toUpperCase(); return status === "OPEN" ? "warn" : status === "RESOLVED" ? "ok" : "info"; }
+
+      function fetchJSON(path, opts, timeoutMs) {
+        var ctl = new AbortController();
+        var timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 15000);
+        var o = Object.assign({ signal: ctl.signal }, opts || {});
+        return fetch(BASE + path, o).then(function (res) {
+          clearTimeout(timer);
+          if (!res.ok) {
+            return res.text().catch(function () { return ""; }).then(function (text) {
+              throw new Error("HTTP " + res.status + " " + path + (text ? " — " + text.slice(0, 200) : ""));
+            });
+          }
+          return res.json();
+        }).catch(function (e) { clearTimeout(timer); throw e; });
       }
 
-      /* ── registry ── */
+      function setConn(ok, msg) {
+        var el = document.getElementById("connState");
+        el.textContent = ok ? "Connected" : "Connection error";
+        el.style.color = ok ? "" : "#B3282F";
+        el.title = msg || "";
+        document.getElementById("updatedAt").textContent = "Updated " + new Date().toLocaleTimeString();
+      }
+
+      /* ── registry (real charts only) ── */
       var R = {};
       R.cpu = function (n) {
-        var L = labels(); lineChart(n, {
-          labels: L, threshold: 80, mark: [S, E], max: 100, ticks: 4, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "CPU utilization",
-          series: [{ name: "payments-api", color: C.iris, data: series(N(), { base: 34, noise: 7, seed: 11, event: function (t, y) { return y + bump(t, S, P, E, 56); } }) },
-          { name: "orders-svc", color: C.teal, data: series(N(), { base: 41, noise: 6, seed: 23, event: function (t, y) { return y + bump(t, S + .04, P, E, 14); } }) },
-          { name: "checkout-web", color: C.grey, data: series(N(), { base: 27, noise: 5, seed: 37 }) }]
+        lineChart(n, {
+          max: 100, ticks: 4, threshold: 80, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "CPU utilization",
+          series: [{ name: "aegis-api-service", color: C.iris, fill: true, data: cpuBuf.length ? cpuBuf : [0] }]
         });
       };
       R.mem = function (n) {
-        var L = labels(); lineChart(n, {
-          labels: L, threshold: 85, mark: [S, E], max: 100, ticks: 4, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "memory utilization",
-          series: [{ name: "payments-api", color: C.iris, data: series(N(), { base: 52, noise: 3, seed: 5, event: function (t, y) { return t < E ? y + ramp(t, 0, P) * 44 : y + 8; } }) },
-          { name: "orders-svc", color: C.teal, data: series(N(), { base: 58, noise: 4, seed: 19 }) },
-          { name: "checkout-web", color: C.grey, data: series(N(), { base: 44, noise: 4, seed: 29 }) }]
-        });
-      };
-      R.req = function (n) {
-        var L = labels(); lineChart(n, {
-          labels: L, fmtY: function (v) { return (v / 1000).toFixed(0) + "k"; }, fmtV: function (v) { return Math.round(v).toLocaleString(); }, aria: "request count",
-          series: [{ name: "This period", color: C.iris, fill: true, data: series(N(), { base: 16800, noise: 1700, seed: 41, event: function (t, y) { return y - bump(t, S, P, E, 4200); } }) },
-          { name: "Previous period", color: "#A9AFB8", dash: true, w: 1.1, data: series(N(), { base: 16200, noise: 1500, seed: 61 }) }]
-        });
-      };
-      R.lat = function (n) {
-        var L = labels(); lineChart(n, {
-          labels: L, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return Math.round(v) + " ms"; }, aria: "response time",
-          series: [{ name: "p99", color: C.iris, data: series(N(), { base: 640, noise: 90, seed: 13, event: function (t, y) { return y + bump(t, S, P, E, 3100); } }) },
-          { name: "p95", color: C.teal, data: series(N(), { base: 320, noise: 45, seed: 17, event: function (t, y) { return y + bump(t, S, P, E, 980); } }) },
-          { name: "p50", color: C.grey, data: series(N(), { base: 118, noise: 16, seed: 31, event: function (t, y) { return y + bump(t, S, P, E, 140); } }) }]
-        });
-      };
-      R.err = function (n) {
-        var m = Math.min(N(), 36), all = labels(), step = Math.ceil(all.length / m), L = [], i;
-        for (i = 0; i < all.length; i += step)L.push(all[i]);
-        var c = L.length;
-        var a = series(c, { base: 38, noise: 16, seed: 7 }).map(Math.round);
-        var b = series(c, { base: 3, noise: 3, seed: 9, event: function (t, y) { return y + bump(t, S, P, E, 148); } }).map(Math.round);
-        barChart(n, {
-          cats: L, stack: true, height: 150, fmtV: function (v) { return Math.round(v); }, aria: "HTTP 4xx and 5xx counts",
-          series: [{ name: "4xx", color: C.warn, data: a }, { name: "5xx", color: C.crit, data: b }],
-          line: { name: "Error rate %", color: C.iris2, data: b.map(function (v, i) { return (v + a[i] * .1) / 170 * 6; }), max: 8 }
-        });
-      };
-      R.db = function (n) {
-        var L = labels(); lineChart(n, {
-          labels: L, max: 100, ticks: 4, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "database health",
-          series: [{ name: "CPU", color: C.iris, data: series(N(), { base: 42, noise: 6, seed: 77, event: function (t, y) { return y + bump(t, S, P, E, 17); } }) },
-          { name: "Connections", color: C.teal, data: series(N(), { base: 64, noise: 7, seed: 83, event: function (t, y) { return y + bump(t, S, P, E, 22); } }) }]
-        });
-      };
-      R.heap = function (n) {
         lineChart(n, {
-          height: 104, padLeft: 30, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return Math.round(v) + " MiB"; }, aria: "heap after GC",
-          series: [{ name: "Heap after GC", color: C.iris, fill: true, data: series(48, { base: 600, noise: 22, seed: 3, event: function (t, y) { return y + t * 1180; } }) }]
+          max: 100, ticks: 4, threshold: 85, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return v.toFixed(1) + "%"; }, aria: "memory utilization",
+          series: [{ name: "aegis-api-service", color: C.teal, fill: true, data: memBuf.length ? memBuf : [0] }]
         });
       };
-      R.oom = function (n) {
-        barChart(n, {
-          height: 126, padLeft: 24, cats: ["04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15"], fmtV: function (v) { return Math.round(v) + " kills"; }, aria: "OOM kills per hour",
-          series: [{ name: "OOM kills", color: C.crit, data: [0, 0, 0, 0, 1, 2, 3, 5, 9, 12, 11, 4] }]
-        });
-      };
-      R.rcaRank = function (n) {
-        hBars(n, {
-          labelW: 152, max: 1, aria: "root cause candidate ranking", rows: [
-            { k: "Memory leak in v2.14.3", v: .91, label: "0.91", color: C.iris },
-            { k: "Connection pool exhaustion", v: .44, label: "0.44", color: "#8C97DE" },
-            { k: "Aurora writer contention", v: .27, label: "0.27", color: "#C6CAE4" },
-            { k: "Upstream retry storm", v: .19, label: "0.19", color: "#C6CAE4" },
-            { k: "Node disk pressure", v: .06, label: "0.06", color: "#E1E3E9" }]
-        });
-      };
-      R.blast = function (n) {
-        hBars(n, {
-          labelW: 96, max: 100, aria: "blast radius", rows: [
-            { k: "payments-api", v: 100, label: "8 tasks", color: C.crit },
-            { k: "checkout-web", v: 38, label: "retries", color: C.warn },
-            { k: "ledger-worker", v: 22, label: "queue lag", color: C.warn },
-            { k: "6 other services", v: 2, label: "none", color: C.grey }]
-        });
-      };
-      R.steps = function (n) {
-        hBars(n, {
-          labelW: 112, rowH: 20, aria: "step durations", rows: [
-            { k: "Detect", v: 42, label: "42 s", color: C.grey }, { k: "Correlate", v: 8, label: "8 s", color: C.grey },
-            { k: "Root cause", v: 31, label: "31 s", color: C.grey }, { k: "Safety check", v: 3, label: "3 s", color: C.grey },
-            { k: "Roll back", v: 94, label: "94 s", color: C.iris }, { k: "Verify", v: 60, label: "queued", color: "#E1E3E9" }]
-        });
-      };
-      R.ba = function (n) {
-        grouped(n, [
-          { k: "CPU utilization", a: 88, b: 34, al: "88%", bl: "34%" },
-          { k: "Memory utilization", a: 96, b: 51, al: "96%", bl: "51%" },
-          { k: "p95 latency", a: 1310, b: 212, al: "1,310 ms", bl: "212 ms" },
-          { k: "5xx rate", a: 6.4, b: .04, al: "6.40%", bl: "0.04%" },
-          { k: "Healthy tasks", a: 5, b: 8, al: "5 of 8", bl: "8 of 8" }]);
-      };
+      R.spkCpu = function (n) { spark(n, { color: C.iris, data: cpuBuf.length ? cpuBuf : [0] }); };
+      R.spkMem = function (n) { spark(n, { color: C.teal, data: memBuf.length ? memBuf : [0] }); };
       R.outcome = function (n) {
+        var counts = { PASSED: 0, FAILED: 0, BLOCKED_BY_POLICY: 0, OTHER: 0 };
+        (window.__chaosHistory || []).forEach(function (t) { var k = counts.hasOwnProperty(t.status) ? t.status : "OTHER"; counts[k]++; });
+        var total = counts.PASSED + counts.FAILED + counts.BLOCKED_BY_POLICY + counts.OTHER;
         donut(n, {
-          centre: "69", lab: "attempts", slices: [
-            { k: "Verified", v: 59, color: C.iris }, { k: "Recovered on retry", v: 6, color: C.teal },
-            { k: "Escalated", v: 3, color: C.warn }, { k: "Failed", v: 1, color: C.crit }]
+          centre: String(total), lab: "attempts", slices: [
+            { k: "Recovered", v: counts.PASSED || 0.0001, color: C.iris },
+            { k: "Blocked by policy", v: counts.BLOCKED_BY_POLICY || 0.0001, color: C.warn },
+            { k: "Failed", v: counts.FAILED || 0.0001, color: C.crit },
+            { k: "Other", v: counts.OTHER || 0.0001, color: C.grey }]
         });
       };
-      R.wf = function (n) {
-        hBars(n, {
-          labelW: 74, rowH: 20, aria: "executions by state", rows: [
-            { k: "Succeeded", v: 11, label: "11", color: C.ok }, { k: "Running", v: 1, label: "1", color: C.iris },
-            { k: "Failed", v: 1, label: "1", color: C.crit }, { k: "Aborted", v: 0, label: "0", color: C.grey }]
-        });
-      };
-      R.loop = function (n) {
-        lineChart(n, {
-          height: 130, padLeft: 30, threshold: 500, fmtY: function (v) { return Math.round(v); }, fmtV: function (v) { return Math.round(v) + " ms"; }, aria: "supervisor loop duration",
-          series: [{ name: "Loop duration", color: C.iris, data: series(60, { base: 280, noise: 60, seed: 101, event: function (t, y) { return y + bump(t, .55, .7, .85, 190); } }) }]
-        });
-      };
-      R.corr = function (n) { corr(n); };
-      R.dep = function (n) { depGraph(n); };
-      R.spkMttd = function (n) { spark(n, { color: C.iris, data: [121, 108, 96, 84, 77, 68, 60, 42] }); };
-      R.spkMttr = function (n) { spark(n, { color: C.iris, data: [14.2, 12.8, 11.1, 9.6, 8.4, 6.9, 5.2, 4.2] }); };
-      R.spkSucc = function (n) { spark(n, { color: C.teal, data: [81, 84, 83, 88, 90, 91, 93, 94.2] }); };
-      R.spkRca = function (n) { spark(n, { color: C.warn, data: [76, 79, 83, 86, 88, 90.7, 90.5, 88.6] }); };
-      R.spkAudit = function (n) { spark(n, { color: C.teal, data: [98, 99, 100, 100, 99, 100, 100, 100] }); };
 
-      /* ── tables and lists ── */
-      var SVC = [["payments-api", 5, 8, 88, 96, "1,310 ms", "6.40%", "v2.14.3", "crit", "Unhealthy"],
-      ["orders-svc", 4, 4, 55, 62, "286 ms", "0.31%", "v1.8.0", "warn", "Degraded"],
-      ["checkout-web", 6, 6, 27, 44, "164 ms", "0.08%", "v3.2.1", "ok", "Healthy"],
-      ["auth-svc", 3, 3, 31, 38, "92 ms", "0.02%", "v1.4.7", "ok", "Healthy"],
-      ["ledger-worker", 4, 4, 46, 57, "—", "0.00%", "v0.9.12", "warn", "Queue lag"],
-      ["notify-svc", 2, 2, 18, 29, "71 ms", "0.01%", "v2.0.3", "ok", "Healthy"],
-      ["search-api", 3, 3, 39, 48, "203 ms", "0.06%", "v5.1.0", "ok", "Healthy"],
-      ["pricing-svc", 2, 2, 24, 36, "118 ms", "0.03%", "v1.1.9", "ok", "Healthy"],
-      ["admin-api", 1, 1, 12, 22, "141 ms", "0.00%", "v0.7.4", "ok", "Healthy"]];
-      function bar(v) { return '<span class="mb"><i class="' + (v > 85 ? "crit" : v > 60 ? "warn" : "ok") + '" style="width:' + v + '%"></i></span> <span class="num" style="font-size:11px;color:var(--tx2)">' + v + '%</span>'; }
-      document.getElementById("svcRows").innerHTML = SVC.map(function (s) {
-        return '<tr><td><span class="svc"><i class="dot ' + s[8] + '"></i>' + s[0] + '</span></td><td class="num">' + s[1] + '/' + s[2] + '</td>' +
-          '<td>' + bar(s[3]) + '</td><td>' + bar(s[4]) + '</td><td class="r num">' + s[5] + '</td>' +
-          '<td class="r num" style="color:' + (s[8] === "crit" ? "#B3282F" : "var(--tx2)") + '">' + s[6] + '</td>' +
-          '<td class="num" style="color:var(--tx2)">' + s[7] + '</td><td><span class="tag ' + s[8] + '">' + s[9] + '</span></td></tr>';
-      }).join("");
-
-      document.getElementById("depRows").innerHTML = [["payments-api", "v2.14.3", "08:12", "warn", "Suspect"],
-      ["orders-svc", "v1.8.0", "06:40", "ok", "Stable"], ["search-api", "v5.1.0", "21:05", "ok", "Stable"],
-      ["checkout-web", "v3.2.1", "18:22", "ok", "Stable"], ["notify-svc", "v2.0.3", "14:07", "ok", "Stable"],
-      ["pricing-svc", "v1.1.9", "11:30", "ok", "Stable"]].map(function (d) {
-        return '<tr><td>' + d[0] + '</td><td class="num" style="color:var(--tx2)">' + d[1] + '</td><td class="num" style="color:var(--tx2)">' + d[2] + '</td><td><span class="tag ' + d[3] + '">' + d[4] + '</span></td></tr>';
-      }).join("");
-
-      document.getElementById("agentRows").innerHTML = [["supervisor.py", "ok", "Running", "0", "284 ms", "4 s"],
-      ["detector.py", "ok", "Running", "2", "96 ms", "3 s"], ["correlation.py", "ok", "Running", "0", "41 ms", "6 s"],
-      ["rca.py", "ok", "Running", "1", "6.4 s", "9 s"], ["ai_reasoning.py", "warn", "Throttled", "3", "8.1 s", "11 s"],
-      ["policy.py", "ok", "Running", "0", "12 ms", "2 s"], ["controller.py", "ok", "Running", "1", "210 ms", "5 s"],
-      ["workflow.py", "ok", "Running", "1", "—", "7 s"]].map(function (a) {
-        return '<tr><td><span class="svc"><i class="dot ' + a[1] + '"></i><span class="mono" style="font-size:11px">' + a[0] + '</span></span></td>' +
-          '<td style="color:var(--tx2)">' + a[2] + '</td><td class="r num">' + a[3] + '</td><td class="r num" style="color:var(--tx2)">' + a[4] + '</td><td class="r num" style="color:var(--tx3)">' + a[5] + '</td></tr>';
-      }).join("");
-
-      var INC = [["INC-2481", "payments-api", "Memory saturation with 5xx surge", "p1", "P1", "Recovering", "12:03:40", "41m", "AEGIS agent", "91%", 1],
-      ["INC-2479", "orders-svc", "Retry budget exhaustion", "p2", "P2", "Diagnosing", "12:11:02", "33m", "AEGIS agent", "74%", 0],
-      ["INC-2476", "search-api", "Elevated p99 on index refresh", "p3", "P3", "Monitoring", "09:48:19", "2h 56m", "s.raman", "68%", 0],
-      ["INC-2470", "ledger-worker", "Queue depth above threshold", "p3", "P3", "Resolved", "Yest 23:14", "18m", "AEGIS agent", "83%", 0],
-      ["INC-2468", "auth-svc", "Token cache eviction storm", "p2", "P2", "Resolved", "Yest 19:02", "9m", "AEGIS agent", "89%", 0],
-      ["INC-2465", "orders-svc", "Traffic surge saturation", "p3", "P3", "Resolved", "Yest 14:41", "12m", "AEGIS agent", "81%", 0]];
-      document.getElementById("incRows").innerHTML = INC.map(function (r) {
-        var t = r[5] === "Resolved" ? "ok" : r[5] === "Recovering" ? "warn" : r[5] === "Diagnosing" ? "iris" : "info";
-        return '<tr class="' + (r[10] ? "sel" : "") + '"><td class="num">' + r[0] + '</td><td>' + r[1] + '</td><td style="color:var(--tx2)">' + r[2] + '</td>' +
-          '<td><span class="sev ' + r[3] + '">' + r[4] + '</span></td><td><span class="tag ' + t + '">' + r[5] + '</span></td>' +
-          '<td class="num" style="color:var(--tx2)">' + r[6] + '</td><td class="num" style="color:var(--tx2)">' + r[7] + '</td><td style="color:var(--tx2)">' + r[8] + '</td><td class="r num">' + r[9] + '</td></tr>';
-      }).join("");
-
-      document.getElementById("incDetail").innerHTML = [["Incident ID", "<span class='mono'>INC-2481</span>"],
-      ["Service", "payments-api"], ["Anomaly", "Memory saturation, 5xx surge"], ["Severity", "<span class='sev p1'>P1</span>"],
-      ["Status", "<span class='tag warn'>Recovering</span>"], ["First signal", "12:03:40 IST"],
-      ["Detected", "12:04:22 <span style='color:var(--tx3)'>(+42 s)</span>"], ["Correlated signals", "6"],
-      ["Impact", "18.4% of requests"], ["Root cause", "Memory leak in v2.14.3"], ["Action", "Rollback to v2.14.2"],
-      ["Store", "<span class='mono' style='font-size:10.5px'>aegis-incidents</span>"]].map(function (k) {
-        return '<div class="kv"><span class="k">' + k[0] + '</span><span class="v">' + k[1] + '</span></div>';
-      }).join("");
-
-      document.getElementById("alertBody").innerHTML = [["crit", "INC-2481 escalated", "Tier-0 rollback needs operator approval", "3m"],
-      ["warn", "Aurora pool at 78%", "Approaching the 85% alarm threshold", "11m"],
-      ["warn", "orders-svc retry budget 62%", "Downstream payments-api is failing", "14m"],
-      ["info", "Chaos run CHX-0412 blocked", "A P1 incident is open on the target", "22m"]].map(function (a) {
-        return '<div class="alert"><i class="dot ' + a[0] + '" style="margin-top:4px"></i><div><div class="t">' + a[1] + '</div><div class="m">' + a[2] + '</div></div><div class="w2">' + a[3] + '</div></div>';
-      }).join("");
-
-      document.getElementById("escBody").innerHTML = [["crit", "INC-2481 · payments-api", "Rollback on a tier-0 service needs approval", "3m 12s"],
-      ["warn", "INC-2479 · orders-svc", "Confidence 74% is below the 85% threshold", "9m 40s"],
-      ["info", "INC-2476 · search-api", "Assigned to s.raman, no action proposed", "2h 56m"]].map(function (a) {
-        return '<div class="alert"><i class="dot ' + a[0] + '" style="margin-top:4px"></i><div><div class="t">' + a[1] + '</div><div class="m">' + a[2] + '</div></div><div class="w2">' + a[3] + '</div></div>';
-      }).join("");
-
-      document.getElementById("reasonSteps").innerHTML = [
-        ["done", "Memory is the leading signal", "Memory climbed monotonically from 52% to 96% over 3 h 40 m while CPU stayed flat until tasks began dying. A load-driven cause would move both together.", "Correlation with 5xx: 0.94"],
-        ["done", "The climb starts at a deploy boundary", "Growth begins within four minutes of v2.14.3 reaching all tasks at 08:12. The previous two deploys show no comparable slope.", "Change proximity: 0.86"],
-        ["done", "Heap is not reclaimed after GC", "Post-GC heap rises 41 MiB/hour on every task independently, so this is retention rather than traffic pressure.", "47 OutOfMemoryError entries"],
-        ["done", "Database and upstream causes are ruled out", "Aurora CPU peaked at 46% with no deadlocks and upstream 429s stayed at zero. Pool saturation follows the incident rather than preceding it.", "Both candidates below 0.45"],
-        ["run", "Rollback is the lowest-risk remedy", "Restarting clears the symptom for about 3.5 hours and would repeat. Raising the memory limit delays it. Rolling back removes the change that introduced the leak.", "Reversible in 90 s"]
-      ].map(function (s) { return '<div class="step ' + s[0] + '"><div class="mk">' + (s[0] === "run" ? "→" : "✓") + '</div><div><div class="t">' + s[1] + '</div><div class="d">' + s[2] + '</div><div class="m">' + s[3] + '</div></div></div>'; }).join("");
-
-      document.getElementById("wfSteps").innerHTML = [
-        ["done", "Detection", "Anomaly raised by supervisor.py", "12:04:22 · 42 s"],
-        ["done", "Correlation", "6 signals grouped into INC-2481", "12:04:30 · 8 s"],
-        ["done", "Root cause analysis", "Memory leak in v2.14.3 at 91% confidence", "12:05:01 · 31 s"],
-        ["done", "Safety evaluation", "Medium risk, 18.4% of traffic, reversible", "12:05:04 · 3 s"],
-        ["run", "Recovery", "Rolling back 8 tasks to v2.14.2 — 5 complete", "12:09:11 · running"],
-        ["", "Verification", "Five-minute health comparison against baseline", "Queued"]
-      ].map(function (s) { return '<div class="step ' + s[0] + '"><div class="mk">' + (s[0] === "done" ? "✓" : s[0] === "run" ? "→" : "·") + '</div><div><div class="t">' + s[1] + '</div><div class="d">' + s[2] + '</div><div class="m">' + s[3] + '</div></div></div>'; }).join("");
-
-      document.getElementById("recRows").innerHTML = [
-        ["12:09:11", "INC-2481", "payments-api", "Rollback to v2.14.2", "r.shah", "2m 48s", "warn", "Running"],
-        ["09:52:04", "INC-2476", "search-api", "Scale 3 → 5 tasks", "Autonomous", "3m 10s", "ok", "Verified"],
-        ["23:16:40", "INC-2470", "ledger-worker", "Restart 2 tasks", "Autonomous", "1m 44s", "ok", "Verified"],
-        ["19:03:55", "INC-2468", "auth-svc", "Restart 3 tasks", "Autonomous", "58s", "ok", "Verified"],
-        ["14:41:20", "INC-2465", "orders-svc", "Scale 4 → 6 tasks", "Autonomous", "2m 02s", "ok", "Verified"],
-        ["11:07:33", "INC-2461", "payments-api", "Rollback to v2.13.9", "r.shah", "4m 36s", "crit", "Failed, retried"],
-        ["08:22:10", "INC-2458", "notify-svc", "Restart 1 task", "Autonomous", "41s", "ok", "Verified"]
-      ].map(function (r) {
-        return '<tr><td class="num" style="color:var(--tx2)">' + r[0] + '</td><td class="num">' + r[1] + '</td><td>' + r[2] + '</td>' +
-          '<td style="color:var(--tx2)">' + r[3] + '</td><td>' + r[4] + '</td><td class="r num" style="color:var(--tx2)">' + r[5] + '</td><td><span class="tag ' + r[6] + '">' + r[7] + '</span></td></tr>';
-      }).join("");
-
-      document.getElementById("chaosRows").innerHTML = [
-        ["Today 10:14", "Memory pressure", "orders-svc", "5 min", "48 s", "2m 10s", "ok", "Detected and recovered"],
-        ["Today 07:30", "Task failure", "notify-svc", "2 min", "11 s", "36 s", "ok", "Detected and recovered"],
-        ["Yest 16:02", "Latency injection", "checkout-web", "5 min", "44 s", "3m 04s", "warn", "Slow detection"],
-        ["Yest 11:45", "CPU spike", "search-api", "2 min", "26 s", "1m 52s", "ok", "Detected and recovered"],
-        ["17 Sep 15:20", "Memory pressure", "ledger-worker", "10 min", "68 s", "4m 40s", "crit", "Missed MTTD target"],
-        ["17 Sep 09:02", "Task failure", "pricing-svc", "2 min", "14 s", "47 s", "ok", "Detected and recovered"]
-      ].map(function (r) {
-        return '<tr><td class="num" style="color:var(--tx2)">' + r[0] + '</td><td>' + r[1] + '</td><td style="color:var(--tx2)">' + r[2] + '</td>' +
-          '<td class="num" style="color:var(--tx2)">' + r[3] + '</td><td class="r num">' + r[4] + '</td><td class="r num">' + r[5] + '</td><td><span class="tag ' + r[6] + '">' + r[7] + '</span></td></tr>';
-      }).join("");
-
-      document.getElementById("auditRows").innerHTML = [
-        ["12:09:11", "INC-2481", "Memory leak v2.14.3", "Rollback to v2.14.2", "r.shah", "warn", "In progress"],
-        ["12:05:04", "INC-2481", "Memory leak v2.14.3", "Safety evaluation", "policy.py", "info", "Human review"],
-        ["12:05:01", "INC-2481", "Memory leak v2.14.3", "RCA completed, 91%", "rca.py", "ok", "Recorded"],
-        ["12:04:22", "INC-2481", "—", "Incident opened", "supervisor.py", "info", "Recorded"],
-        ["11:58:02", "INC-2479", "Retry budget exhaustion", "No action proposed", "rca.py", "warn", "Below threshold"],
-        ["09:52:04", "INC-2476", "Index refresh contention", "Scale 3 → 5 tasks", "controller.py", "ok", "Verified"],
-        ["23:16:40", "INC-2470", "Consumer stall", "Restart 2 tasks", "controller.py", "ok", "Verified"],
-        ["19:03:55", "INC-2468", "Cache eviction storm", "Restart 3 tasks", "controller.py", "ok", "Verified"],
-        ["14:41:20", "INC-2465", "Traffic surge", "Scale 4 → 6 tasks", "controller.py", "ok", "Verified"],
-        ["11:07:33", "INC-2461", "Bad revision v2.14.0", "Rollback to v2.13.9", "r.shah", "crit", "Failed, retried"],
-        ["08:22:10", "INC-2458", "Thread pool deadlock", "Restart 1 task", "controller.py", "ok", "Verified"],
-        ["04:11:47", "INC-2455", "Certificate rotation lag", "Escalated to operator", "controller.py", "warn", "Operator resolved"]
-      ].map(function (r) {
-        return '<tr><td class="num" style="color:var(--tx2)">' + r[0] + '</td><td class="num">' + r[1] + '</td><td style="color:var(--tx2)">' + r[2] + '</td>' +
-          '<td>' + r[3] + '</td><td class="mono" style="font-size:11px;color:var(--tx2)">' + r[4] + '</td><td><span class="tag ' + r[5] + '">' + r[6] + '</span></td></tr>';
-      }).join("");
-
-      var LOGS = [["12:41:52", "FATAL", "payments-api", "java.lang.OutOfMemoryError: Java heap space in ChargeProcessor.settle()"],
-      ["12:41:52", "ERROR", "payments-api", "Task 8f2a1c stopped: essential container exited with code 137"],
-      ["12:40:18", "ERROR", "payments-api", "Upstream timeout after 5000ms calling ledger-queue.enqueue"],
-      ["12:39:44", "WARN", "orders-svc", "Retry budget 62% consumed for payments-api.charge"],
-      ["12:38:02", "ERROR", "alb-prod", "HTTP 502 for POST /v2/charge — target returned no response"],
-      ["12:36:31", "WARN", "payments-api", "GC pause 1842ms, old gen 1.93 GiB of 2.00 GiB"],
-      ["12:34:09", "INFO", "supervisor", "Anomaly candidate: memory_saturation payments-api score 0.88"],
-      ["12:33:57", "WARN", "aurora-pg", "Connection pool 78% saturated (312 of 400)"],
-      ["12:31:12", "ERROR", "payments-api", "Circuit breaker opened for ledger-queue after 12 failures"],
-      ["12:28:40", "INFO", "supervisor", "Detection cycle complete in 284ms, 9 services sampled"],
-      ["12:26:15", "WARN", "ledger-worker", "Queue depth 2104 exceeds warning threshold 1500"],
-      ["12:22:03", "INFO", "ecs-agent", "Task 4d9b77 registered in target group tg-payments"],
-      ["12:19:41", "ERROR", "payments-api", "Unhandled rejection in settlement batch 88213"],
-      ["12:14:08", "INFO", "controller", "Policy evaluation requested for candidate INC-2481"],
-      ["12:09:11", "INFO", "workflow", "Execution aegis-recover-2481 started"]];
-      function renderLogs(lv) {
-        document.getElementById("logBody").innerHTML = LOGS.filter(function (l) { return lv === "all" || l[1] === lv || (lv === "ERROR" && l[1] === "FATAL"); })
-          .map(function (l) { return '<div class="lg"><span class="ts">' + l[0] + '</span><span class="lv ' + l[1] + '">' + l[1] + '</span><span class="src">' + l[2] + '</span><span class="msg" title="' + esc(l[3]) + '">' + esc(l[3]) + '</span></div>'; }).join("");
-      }
-      renderLogs("all");
-      (function () { var g = document.getElementById("gauge"), h = "", i; for (i = 0; i < 20; i++)h += '<s class="' + (i < 18 ? "f" : i < 19 ? "p" : "") + '"></s>'; g.innerHTML = h; })();
-
-      /* ── behaviour ── */
       function draw(root) {
         (root || document).querySelectorAll("[data-chart]").forEach(function (n) {
           if (!n.clientWidth) return; var f = R[n.getAttribute("data-chart")]; if (f) f(n);
         });
       }
-      draw();
+
+      (function initGauge() { var g = document.getElementById("gauge"), h = "", i; for (i = 0; i < 20; i++)h += "<s></s>"; g.innerHTML = h; })();
+      function setGauge(frac) {
+        var g = document.getElementById("gauge"); if (!g) return;
+        var filled = Math.round(Math.max(0, Math.min(1, frac)) * 20), h = "", i;
+        for (i = 0; i < 20; i++)h += '<s class="' + (i < filled ? "f" : "") + '"></s>';
+        g.innerHTML = h;
+      }
+
+      /* ── overview / metrics / service health ── */
+      function renderOverview(status) {
+        var svc = status.ecs_service || {};
+        var running = svc.running_count || 0, desired = svc.desired_count || 0;
+        var ring = document.getElementById("healthArc"), label = document.getElementById("healthLabel"), detail = document.getElementById("healthDetail");
+        var circ = 113.1, frac = desired > 0 ? running / desired : (svc.healthy ? 1 : 0);
+        var color, text;
+        if (svc.error) { color = "#98A0AB"; text = "Unknown"; detail.textContent = "Could not reach ECS: " + svc.error; }
+        else if (svc.healthy) { color = "#1E8E5A"; text = "Healthy"; detail.textContent = running + " of " + desired + " tasks running, all healthy."; }
+        else if (running > 0) { color = "#C08415"; text = "Degraded"; detail.textContent = running + " of " + desired + " tasks running."; }
+        else { color = "#C8393F"; text = "Critical"; detail.textContent = "No healthy tasks running (" + running + " of " + desired + ")."; }
+        ring.setAttribute("stroke", color);
+        ring.setAttribute("stroke-dasharray", (circ * frac).toFixed(1) + " " + circ.toFixed(1));
+        label.textContent = text; label.style.color = color;
+
+        document.getElementById("statRunning").textContent = running;
+        document.getElementById("statDesired").textContent = desired;
+        var openCount = (status.incidents || {}).open || 0;
+        document.getElementById("statOpenInc").textContent = openCount;
+        document.getElementById("statChaosRuns").textContent = (status.chaos_suite || {}).total_experiments_run || 0;
+
+        document.getElementById("overviewBadge").innerHTML = '<span class="tag ' + (openCount > 0 ? "warn" : "ok") + '">' + openCount + " open incident" + (openCount === 1 ? "" : "s") + '</span>';
+
+        var cpu = (status.metrics || {}).cpu_utilization, mem = (status.metrics || {}).memory_utilization;
+        if (cpu !== null && cpu !== undefined) {
+          cpuBuf.push(cpu); if (cpuBuf.length > POLL_MAX_POINTS) cpuBuf.shift();
+          document.getElementById("kpiCpu").innerHTML = cpu.toFixed(1) + "<s>%</s>";
+          document.getElementById("kpiCpuNote").textContent = cpuBuf.length + " sample" + (cpuBuf.length === 1 ? "" : "s") + " this session";
+        }
+        if (mem !== null && mem !== undefined) {
+          memBuf.push(mem); if (memBuf.length > POLL_MAX_POINTS) memBuf.shift();
+          document.getElementById("kpiMem").innerHTML = mem.toFixed(1) + "<s>%</s>";
+          document.getElementById("kpiMemNote").textContent = memBuf.length + " sample" + (memBuf.length === 1 ? "" : "s") + " this session";
+        }
+
+        document.getElementById("kpiTotalInc").textContent = (status.incidents || {}).total || 0;
+        document.getElementById("kpiOpenInc").textContent = openCount + " currently open";
+
+        latestPolicy = status.remediation_guardrails || latestPolicy;
+        renderPolicy(status.remediation_guardrails);
+        renderWorkflow(status.workflow);
+        renderCorrelation(status.correlation);
+        renderServiceTable(status);
+        renderSysRows(status);
+        draw(document.getElementById("s-overview"));
+        draw(document.getElementById("s-metrics"));
+      }
+
+      function renderServiceTable(status) {
+        var svc = status.ecs_service || {};
+        var cpu = (status.metrics || {}).cpu_utilization, mem = (status.metrics || {}).memory_utilization;
+        function bar(v) { if (v === null || v === undefined) return "—"; return '<span class="mb"><i class="' + (v > 85 ? "crit" : v > 60 ? "warn" : "ok") + '" style="width:' + Math.min(v, 100) + '%"></i></span> <span class="num" style="font-size:11px;color:var(--tx2)">' + v.toFixed(1) + '%</span>'; }
+        var tag = svc.healthy ? "ok" : (svc.running_count > 0 ? "warn" : "crit");
+        var label = svc.healthy ? "Healthy" : (svc.running_count > 0 ? "Degraded" : "Down");
+        document.getElementById("svcRows").innerHTML =
+          '<tr><td><span class="svc"><i class="dot ' + tag + '"></i>' + esc(svc.service || "aegis-api-service") + '</span></td>' +
+          '<td class="num">' + (svc.running_count === undefined ? "—" : svc.running_count) + '/' + (svc.desired_count === undefined ? "—" : svc.desired_count) + '</td>' +
+          '<td>' + bar(cpu) + '</td><td>' + bar(mem) + '</td>' +
+          '<td><span class="tag ' + tag + '">' + label + '</span></td></tr>';
+      }
+
+      function renderSysRows(status) {
+        var svc = status.ecs_service || {}, corr = status.correlation || {}, wf = status.workflow || {}, chaos = status.chaos_suite || {};
+        var rows = [
+          { name: "aegis-api-service", tag: svc.healthy ? "ok" : "warn", state: svc.healthy ? "Healthy" : "Degraded", detail: (svc.running_count === undefined ? "—" : svc.running_count) + " / " + (svc.desired_count === undefined ? "—" : svc.desired_count) + " tasks running", src: "GET /status" },
+          { name: "Correlation engine", tag: corr.pending_signals > 0 ? "warn" : "ok", state: corr.pending_signals > 0 ? "Pending signals" : "Idle", detail: (corr.pending_signals || 0) + " pending in a " + (corr.window_seconds === undefined ? "—" : corr.window_seconds) + "s window", src: "GET /correlation" },
+          { name: "Recovery workflow", tag: wf.status === "ACTIVE" ? "ok" : "warn", state: wf.status || "Unknown", detail: wf.state_machine || "—", src: "GET /workflow" },
+          { name: "Chaos suite", tag: "info", state: (chaos.total_experiments_run || 0) + " runs recorded", detail: (chaos.available_tests || []).length + " scenarios available", src: "GET /chaos/history" }
+        ];
+        document.getElementById("sysRows").innerHTML = rows.map(function (r) {
+          return '<tr><td><span class="svc"><i class="dot ' + r.tag + '"></i>' + esc(r.name) + '</span></td>' +
+            '<td><span class="tag ' + r.tag + '">' + esc(r.state) + '</span></td>' +
+            '<td style="color:var(--tx2)">' + esc(r.detail) + '</td>' +
+            '<td class="r mono" style="font-size:10.5px;color:var(--tx3)">' + r.src + '</td></tr>';
+        }).join("");
+      }
+
+      function renderPolicy(policy) {
+        if (!policy) return;
+        document.getElementById("polConfidence").textContent = (policy.min_confidence * 100).toFixed(0) + "%";
+        document.getElementById("polMaxDesired").textContent = policy.max_desired_count;
+        document.getElementById("polCooldown").textContent = policy.cooldown_seconds + "s";
+        document.getElementById("polCriticalOnly").textContent = policy.critical_only ? "Yes" : "No";
+        document.getElementById("polActions").textContent = (policy.allowed_actions || []).join(", ");
+      }
+
+      function renderWorkflow(wf) {
+        if (!wf) return;
+        document.getElementById("wfName").textContent = wf.state_machine || "—";
+        document.getElementById("wfStatus").innerHTML = '<span class="tag ' + (wf.status === "ACTIVE" ? "ok" : "warn") + '">' + esc(wf.status || "Unknown") + '</span>';
+        document.getElementById("wfActions").textContent = (wf.supported_actions || []).join(", ");
+      }
+
+      function renderCorrelation(corr) {
+        if (!corr) return;
+        document.getElementById("corrBody").innerHTML =
+          '<div class="kv"><span class="k">Correlation window</span><span class="v num">' + corr.window_seconds + 's</span></div>' +
+          '<div class="kv"><span class="k">Pending signals</span><span class="v num">' + corr.pending_signals + '</span></div>';
+      }
+
+      /* ── incidents ── */
+      function renderIncidents(incidents) {
+        allIncidents = incidents.slice().sort(function (a, b) { return Date.parse(b.timestamp || 0) - Date.parse(a.timestamp || 0); });
+        document.getElementById("incRows").innerHTML = allIncidents.length ? allIncidents.map(function (r) {
+          var sc = sevClass(r.severity), tg = statusTag(r.status);
+          return '<tr data-id="' + esc(r.id) + '" class="' + (r.id === selectedIncidentId ? "sel" : "") + '">' +
+            '<td class="num">' + esc(r.id) + '</td>' +
+            '<td style="color:var(--tx2)">' + esc(r.description || r.metric) + '</td>' +
+            '<td><span class="sev ' + sc + '">' + esc(r.severity) + '</span></td>' +
+            '<td><span class="tag ' + tg + '">' + esc(r.status) + '</span></td>' +
+            '<td class="num" style="color:var(--tx2)">' + fmtTime(r.timestamp) + '</td>' +
+            '<td class="r num">' + ago(r.timestamp) + '</td></tr>';
+        }).join("") : '<tr><td colspan="6" style="color:var(--tx3)">No incidents recorded yet.</td></tr>';
+
+        var open = allIncidents.filter(function (r) { return (r.status || "").toUpperCase() === "OPEN"; });
+        document.getElementById("escBody").innerHTML = open.length ? open.slice(0, 8).map(function (r) {
+          return '<div class="alert"><i class="dot ' + (r.severity === "CRITICAL" ? "crit" : "warn") + '" style="margin-top:4px"></i>' +
+            '<div><div class="t">' + esc(r.id) + '</div><div class="m">' + esc(r.description || r.metric) + '</div></div>' +
+            '<div class="w2">' + ago(r.timestamp) + '</div></div>';
+        }).join("") : '<div class="foot">No open incidents.</div>';
+
+        if (!selectedIncidentId && allIncidents.length) selectIncident(allIncidents[0].id);
+      }
+
+      function selectIncident(id) {
+        selectedIncidentId = id;
+        document.querySelectorAll("#incRows tr").forEach(function (tr) { tr.classList.toggle("sel", tr.getAttribute("data-id") === id); });
+        document.getElementById("incDetailUrl").textContent = "GET /incidents/" + id;
+        document.getElementById("evidenceUrl").textContent = "GET /incidents/" + id + "/evidence";
+        return fetchJSON("/incidents/" + encodeURIComponent(id)).then(function (incident) {
+          document.getElementById("selIncId").textContent = incident.id;
+          document.getElementById("selIncSub").innerHTML = " · " + esc(incident.service) + " · " + esc(incident.description) +
+            ' <span class="sev ' + sevClass(incident.severity) + '" style="margin-left:6px">' + esc(incident.severity) + '</span>';
+          document.getElementById("incDetail").innerHTML = [
+            ["Incident ID", "<span class='mono'>" + esc(incident.id) + "</span>"],
+            ["Service", esc(incident.service)],
+            ["Metric", esc(incident.metric)],
+            ["Value / threshold", incident.value + " / " + incident.threshold],
+            ["Severity", "<span class='sev " + sevClass(incident.severity) + "'>" + esc(incident.severity) + "</span>"],
+            ["Status", "<span class='tag " + statusTag(incident.status) + "'>" + esc(incident.status) + "</span>"],
+            ["Type", esc(incident.incident_type)],
+            ["Detected", fmtTime(incident.timestamp)],
+            ["Recommended action", esc(incident.recommended_action)]
+          ].map(function (k) { return '<div class="kv"><span class="k">' + k[0] + '</span><span class="v">' + k[1] + '</span></div>'; }).join("");
+
+          loadEvidence(id, incident);
+          runRCA(incident);
+        }).catch(function (e) {
+          document.getElementById("incDetail").innerHTML = '<div class="foot">Could not load incident: ' + esc(e.message) + '</div>';
+        });
+      }
+
+      function loadEvidence(id, incident) {
+        var body = document.getElementById("evidenceBody");
+        var key = (incident.metadata || {}).evidence_s3_key;
+        if (!key) { body.innerHTML = '<div class="foot">No archived evidence for this incident.</div>'; return; }
+        fetchJSON("/incidents/" + encodeURIComponent(id) + "/evidence").then(function (res) {
+          var html = '<div class="kv"><span class="k">S3 key</span><span class="v mono" style="font-size:10px">' + esc(res.evidence_s3_key) + '</span></div>';
+          Object.keys(res.evidence || {}).forEach(function (k) {
+            html += '<div class="hr"></div><div class="w-u m">' + esc(k) + '</div><pre style="white-space:pre-wrap;font-family:var(--mono);font-size:10.5px;color:var(--tx2);margin:0">' + esc(JSON.stringify(res.evidence[k], null, 2)) + '</pre>';
+          });
+          body.innerHTML = html;
+        }).catch(function (e) {
+          body.innerHTML = '<div class="foot">Evidence archived but could not be retrieved: ' + esc(e.message) + '</div>';
+        });
+      }
+
+      /* ── root cause ── */
+      function runRCA(incident) {
+        document.getElementById("rcaSummary").textContent = "Running rca.py + ai_reasoning.py…";
+        document.getElementById("rcaRunId").textContent = incident.id;
+        var t0 = performance.now();
+        return fetchJSON("/reason", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: incident.id, metric: incident.metric, value: incident.value, threshold: incident.threshold, severity: incident.severity, service: incident.service })
+        }).then(function (res) {
+          var latency = performance.now() - t0;
+          var a = res.analysis || {};
+          document.getElementById("rcaSummary").innerHTML = "<b>" + esc(a.likely_cause || "No cause identified") + "</b> " + esc(a.summary || "");
+          document.getElementById("rcaEvidence").innerHTML = Object.keys(a.evidence || {}).map(function (k) {
+            return '<div class="kv"><span class="k">' + esc(k) + '</span><span class="v num">' + esc(String(a.evidence[k])) + '</span></div>';
+          }).join("");
+          var conf = a.confidence || 0;
+          document.getElementById("rcaConfidence").textContent = (conf * 100).toFixed(0) + "%";
+          setGauge(conf);
+          var minConf = latestPolicy ? latestPolicy.min_confidence : null;
+          var noteEl = document.getElementById("rcaThresholdNote");
+          if (minConf !== null) {
+            noteEl.textContent = conf >= minConf ? "Above the " + (minConf * 100).toFixed(0) + "% autonomous-action threshold" : "Below the " + (minConf * 100).toFixed(0) + "% threshold — would be blocked";
+            noteEl.className = "delta " + (conf >= minConf ? "up" : "dn");
+          }
+          document.getElementById("reasonSteps").innerHTML =
+            '<div class="kv"><span class="k">Impact</span><span class="v">' + esc(a.impact || "—") + '</span></div>' +
+            '<div class="kv"><span class="k">Recommended action</span><span class="v">' + esc(a.recommended_action || "—") + '</span></div>';
+          document.getElementById("rcaLatency").textContent = latency < 1000 ? Math.round(latency) + " ms" : (latency / 1000).toFixed(2) + " s";
+          document.getElementById("rcaDiagnosis").textContent = a.recommended_action || "—";
+        }).catch(function (e) {
+          document.getElementById("rcaSummary").textContent = "Could not run analysis: " + e.message;
+        });
+      }
+
+      /* ── chaos ── */
+      function renderChaosButtons() {
+        document.getElementById("chaosButtons").innerHTML = CHAOS_SCENARIOS.map(function (s) {
+          return '<button class="chaos" data-slug="' + s.slug + '"><span><b>' + esc(s.label) + '</b><span>' + esc(s.desc) + '</span></span><span class="tag">Run</span></button>';
+        }).join("");
+        document.getElementById("chaosButtons").addEventListener("click", function (e) {
+          var btn = e.target.closest(".chaos"); if (!btn) return;
+          runChaos(btn.getAttribute("data-slug"), btn);
+        });
+      }
+
+      function runChaos(slug, btn) {
+        var tag = btn.querySelector(".tag");
+        btn.disabled = true; tag.textContent = "Running…";
+        var dryRun = document.getElementById("dryRunChk").checked;
+        // Backend waits up to 120s for Step Functions recovery + verification when
+        // a scenario isn't blocked by policy, so the client timeout must exceed that.
+        fetchJSON("/chaos/" + slug + "?dry_run=" + dryRun, { method: "POST" }, 170000).then(function (res) {
+          var outcome = res.status || (res.test && res.test.status) || "Done";
+          tag.textContent = outcome;
+          document.getElementById("chaosFoot").textContent = slug + ": " + outcome + ". History and incidents refreshed below.";
+        }).catch(function (e) {
+          tag.textContent = "Error";
+          document.getElementById("chaosFoot").textContent = "Error running " + slug + ": " + e.message;
+        }).then(function () {
+          btn.disabled = false;
+          setTimeout(function () { tag.textContent = "Run"; }, 4000);
+          loadChaosHistory();
+          loadIncidents();
+        });
+      }
+
+      function renderChaosHistory(tests) {
+        window.__chaosHistory = tests;
+        var STATUS_TAG = { PASSED: "ok", FAILED: "crit", BLOCKED_BY_POLICY: "warn", SIMULATED: "info", NO_ANOMALY_DETECTED: "ok" };
+        document.getElementById("chaosRows").innerHTML = tests.length ? tests.map(function (t) {
+          return '<tr><td class="num" style="color:var(--tx2)">' + fmtTime(t.timestamp) + '</td><td>' + esc(t.scenario) + '</td>' +
+            '<td><span class="tag ' + (STATUS_TAG[t.status] || "info") + '">' + esc(t.status) + '</span></td>' +
+            '<td class="r">' + (t.recovery_verified === true ? "Yes" : t.recovery_verified === false ? "No" : "—") + '</td></tr>';
+        }).join("") : '<tr><td colspan="4" style="color:var(--tx3)">No chaos runs recorded yet.</td></tr>';
+
+        document.getElementById("recRows").innerHTML = tests.length ? tests.map(function (t) {
+          return '<tr><td class="num" style="color:var(--tx2)">' + fmtTime(t.timestamp) + '</td><td>' + esc(t.scenario) + '</td>' +
+            '<td><span class="tag ' + (STATUS_TAG[t.status] || "info") + '">' + esc(t.status) + '</span></td>' +
+            '<td>' + (t.recovery_verified === true ? "Verified" : t.recovery_verified === false ? "Not verified" : "N/A") + '</td></tr>';
+        }).join("") : '<tr><td colspan="4" style="color:var(--tx3)">No recovery attempts recorded yet.</td></tr>';
+
+        var attempted = tests.filter(function (t) { return t.status === "PASSED" || t.status === "FAILED"; });
+        var passed = tests.filter(function (t) { return t.status === "PASSED"; });
+        var rate = attempted.length ? (passed.length / attempted.length * 100) : null;
+        document.getElementById("kpiRecoveryRate").textContent = rate === null ? "—" : rate.toFixed(0) + "%";
+        document.getElementById("kpiRecoveryNote").textContent = attempted.length ? passed.length + " verified of " + attempted.length + " non-blocked attempts" : "No completed recovery attempts yet";
+
+        draw(document.getElementById("s-recovery"));
+      }
+
+      /* ── polling loop ── */
+      function loadIncidents() {
+        return fetchJSON("/incidents").then(function (inc) { renderIncidents(inc.incidents || []); }).catch(function () { });
+      }
+      function loadChaosHistory() {
+        return fetchJSON("/chaos/history").then(function (hist) { renderChaosHistory(hist.tests || []); }).catch(function () { });
+      }
+      function loadAll() {
+        fetchJSON("/status").then(function (status) {
+          renderOverview(status);
+          setConn(true);
+        }).catch(function (e) { setConn(false, e.message); });
+        loadIncidents();
+        loadChaosHistory();
+      }
+
+      function schedulePolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        var ms = parseInt(document.getElementById("refreshSel").value, 10);
+        if (ms > 0) pollTimer = setInterval(loadAll, ms);
+      }
+
+      /* ── behaviour wiring ── */
+      renderChaosButtons();
+      loadAll();
+      schedulePolling();
 
       document.querySelectorAll(".sec-h").forEach(function (h) {
         h.addEventListener("click", function () {
@@ -2410,21 +2016,14 @@
         });
       });
 
-      document.getElementById("rangeSeg").addEventListener("click", function (e) {
-        var b = e.target.closest("button"); if (!b) return;
-        range = b.getAttribute("data-range");
-        this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
-        draw();
-      });
-      document.getElementById("refreshBtn").addEventListener("click", function () { draw(); });
-      document.getElementById("logSeg").addEventListener("click", function (e) {
-        var b = e.target.closest("button"); if (!b) return;
-        this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
-        renderLogs(b.getAttribute("data-lv"));
+      document.getElementById("refreshSel").addEventListener("change", schedulePolling);
+      document.getElementById("refreshBtn").addEventListener("click", loadAll);
+      document.getElementById("rerunRca").addEventListener("click", function () {
+        if (selectedIncidentId) selectIncident(selectedIncidentId);
       });
       document.getElementById("incRows").addEventListener("click", function (e) {
-        var tr = e.target.closest("tr"); if (!tr) return;
-        this.querySelectorAll("tr").forEach(function (r) { r.classList.toggle("sel", r === tr); });
+        var tr = e.target.closest("tr"); if (!tr || !tr.getAttribute("data-id")) return;
+        selectIncident(tr.getAttribute("data-id"));
       });
 
       var links = [].slice.call(document.querySelectorAll(".index a"));

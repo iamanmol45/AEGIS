@@ -31,6 +31,14 @@ class AegisController:
         self.evidence = EvidenceStore()
         self.rca_engine = RCAEngine(store=self.incident_manager.store)
 
+    def _resolve_if_recovered(self, incident, workflow_result: dict) -> None:
+        """Marks the incident RESOLVED once Step Functions verifies ECS is
+        back at the target state -- otherwise every autonomously-recovered
+        incident stays OPEN forever, since nothing else in the pipeline
+        ever closes one."""
+        if workflow_result.get("recovery_verified", False):
+            self.incident_manager.update_status(incident.id, "RESOLVED")
+
     def _archive_evidence(self, incident, evidence: dict):
         """Uploads raw evidence to S3 and stamps the reference into the
         incident's metadata so DynamoDB stays lean but the full context
@@ -197,8 +205,9 @@ class AegisController:
             # Poll for workflow completion
             workflow_result = self.workflow.wait_for_completion(
                 exec_info["execution_arn"],
-                timeout_seconds=120
+                timeout_seconds=150
             )
+            self._resolve_if_recovered(incident, workflow_result)
 
             self.audit.log({
                 "event": "STEP_FUNCTION_RECOVERY",
@@ -280,8 +289,9 @@ class AegisController:
 
             workflow_result = self.workflow.wait_for_completion(
                 exec_info["execution_arn"],
-                timeout_seconds=120
+                timeout_seconds=150
             )
+            self._resolve_if_recovered(incident, workflow_result)
 
             self.audit.log({
                 "event": "STEP_FUNCTION_RECOVERY",
@@ -359,8 +369,9 @@ class AegisController:
 
             workflow_result = self.workflow.wait_for_completion(
                 exec_info["execution_arn"],
-                timeout_seconds=120
+                timeout_seconds=150
             )
+            self._resolve_if_recovered(incident, workflow_result)
 
             self.audit.log({
                 "event": "STEP_FUNCTION_RECOVERY",

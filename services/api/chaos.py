@@ -47,6 +47,13 @@ class ChaosTestManager:
         self.evidence = evidence or EvidenceStore()
         self.history: List[Dict[str, Any]] = []
 
+    def _resolve_if_recovered(self, incident, recovery_result: dict) -> None:
+        """Marks the incident RESOLVED once ECS is verified back at the
+        target state -- otherwise every chaos-triggered incident stays OPEN
+        forever, since nothing else in the pipeline ever closes one."""
+        if recovery_result.get("recovered", False):
+            self.incident_manager.update_status(incident.id, "RESOLVED")
+
     def _archive_evidence(self, incident, evidence: dict):
         """Uploads raw evidence to S3 and stamps the reference into the
         incident's metadata -- mirrors controller.py's helper, so chaos
@@ -74,7 +81,36 @@ class ChaosTestManager:
             "NORMAL_WORKLOAD",
         ]
 
+    def _record_test(self, test_summary: Dict[str, Any]) -> None:
+        """Append to the local list (fast path for this process) and persist
+        to the shared DynamoDB incident table so /chaos/history is consistent
+        across all API replicas behind the ALB, not just whichever task
+        happens to handle the request."""
+        self.history.insert(0, test_summary)
+        try:
+            self.incident_manager.store.create_incident({
+                "id": test_summary["test_id"],
+                "record_type": "chaos_test",
+                **test_summary,
+            })
+        except Exception:
+            pass
+
     def get_history(self) -> List[Dict[str, Any]]:
+        """Read chaos test history from the shared DynamoDB store so it's
+        consistent no matter which API replica serves the request. Falls
+        back to this process's local history if the store is unreachable
+        or empty (e.g. DynamoDB access issues)."""
+        try:
+            remote = self.incident_manager.store.get_items_by_type("chaos_test", limit=200)
+        except Exception:
+            remote = []
+
+        if remote:
+            return [
+                {k: v for k, v in item.items() if k not in ("id", "incident_id", "record_type")}
+                for item in remote
+            ]
         return self.history
 
     def _get_current_desired_count(self) -> int:
@@ -154,7 +190,7 @@ class ChaosTestManager:
                 "mode": "DRY_RUN",
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             self.audit.log({
                 "event": "CHAOS_TEST_COMPLETED",
@@ -196,7 +232,7 @@ class ChaosTestManager:
                 "recovery_verified": False,
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             return {
                 "test": {"id": test_id, "scenario": scenario, "status": "BLOCKED_BY_POLICY", "timestamp": now_iso},
@@ -226,11 +262,12 @@ class ChaosTestManager:
 
         workflow_result = self.workflow.wait_for_completion(
             exec_info["execution_arn"],
-            timeout_seconds=120,
+            timeout_seconds=150,
         )
 
         # 7. Recovery Verification
         recovery_result = self.recovery.verify(target_desired)
+        self._resolve_if_recovered(incident, recovery_result)
 
         self.audit.log({
             "event": "CHAOS_RECOVERY_VERIFIED",
@@ -260,7 +297,7 @@ class ChaosTestManager:
             "recovery_verified": recovery_result.get("recovered", False),
             "timestamp": now_iso,
         }
-        self.history.insert(0, test_summary)
+        self._record_test(test_summary)
 
         return {
             "test": {"id": test_id, "scenario": scenario, "status": "COMPLETED", "timestamp": now_iso},
@@ -333,7 +370,7 @@ class ChaosTestManager:
                 "mode": "DRY_RUN",
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             self.audit.log({
                 "event": "CHAOS_TEST_COMPLETED",
@@ -374,7 +411,7 @@ class ChaosTestManager:
                 "recovery_verified": False,
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             return {
                 "test": {"id": test_id, "scenario": scenario, "status": "BLOCKED_BY_POLICY", "timestamp": now_iso},
@@ -403,10 +440,11 @@ class ChaosTestManager:
 
         workflow_result = self.workflow.wait_for_completion(
             exec_info["execution_arn"],
-            timeout_seconds=120,
+            timeout_seconds=150,
         )
 
         recovery_result = self.recovery.verify(target_desired)
+        self._resolve_if_recovered(incident, recovery_result)
 
         self.audit.log({
             "event": "CHAOS_RECOVERY_VERIFIED",
@@ -434,7 +472,7 @@ class ChaosTestManager:
             "recovery_verified": recovery_result.get("recovered", False),
             "timestamp": now_iso,
         }
-        self.history.insert(0, test_summary)
+        self._record_test(test_summary)
 
         return {
             "test": {"id": test_id, "scenario": scenario, "status": "COMPLETED", "timestamp": now_iso},
@@ -509,7 +547,7 @@ class ChaosTestManager:
                 "mode": "DRY_RUN",
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             self.audit.log({
                 "event": "CHAOS_TEST_COMPLETED",
@@ -550,7 +588,7 @@ class ChaosTestManager:
                 "recovery_verified": False,
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             return {
                 "test": {"id": test_id, "scenario": scenario, "status": "BLOCKED_BY_POLICY", "timestamp": now_iso},
@@ -579,10 +617,11 @@ class ChaosTestManager:
 
         workflow_result = self.workflow.wait_for_completion(
             exec_info["execution_arn"],
-            timeout_seconds=120,
+            timeout_seconds=150,
         )
 
         recovery_result = self.recovery.verify(target_desired)
+        self._resolve_if_recovered(incident, recovery_result)
 
         self.audit.log({
             "event": "CHAOS_RECOVERY_VERIFIED",
@@ -610,7 +649,7 @@ class ChaosTestManager:
             "recovery_verified": recovery_result.get("recovered", False),
             "timestamp": now_iso,
         }
-        self.history.insert(0, test_summary)
+        self._record_test(test_summary)
 
         return {
             "test": {"id": test_id, "scenario": scenario, "status": "COMPLETED", "timestamp": now_iso},
@@ -700,7 +739,7 @@ class ChaosTestManager:
                 "mode": "DRY_RUN",
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             self.audit.log({
                 "event": "CHAOS_TEST_COMPLETED",
@@ -741,7 +780,7 @@ class ChaosTestManager:
                 "recovery_verified": False,
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             return {
                 "test": {"id": test_id, "scenario": scenario, "status": "BLOCKED_BY_POLICY", "timestamp": now_iso},
@@ -770,10 +809,11 @@ class ChaosTestManager:
 
         workflow_result = self.workflow.wait_for_completion(
             exec_info["execution_arn"],
-            timeout_seconds=120,
+            timeout_seconds=150,
         )
 
         recovery_result = self.recovery.verify(target_desired)
+        self._resolve_if_recovered(incident, recovery_result)
 
         self.audit.log({
             "event": "CHAOS_RECOVERY_VERIFIED",
@@ -801,7 +841,7 @@ class ChaosTestManager:
             "recovery_verified": recovery_result.get("recovered", False),
             "timestamp": now_iso,
         }
-        self.history.insert(0, test_summary)
+        self._record_test(test_summary)
 
         return {
             "test": {"id": test_id, "scenario": scenario, "status": "COMPLETED", "timestamp": now_iso},
@@ -855,7 +895,7 @@ class ChaosTestManager:
                 "recovery_verified": None,
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
             self.audit.log({
                 "event": "CHAOS_TEST_COMPLETED",
                 "test_id": test_id,
@@ -920,7 +960,7 @@ class ChaosTestManager:
                 "mode": "DRY_RUN",
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
             return {
                 "test": {"id": test_id, "scenario": scenario, "status": "SIMULATED", "timestamp": now_iso},
                 "incident": incident.to_dict(),
@@ -949,7 +989,7 @@ class ChaosTestManager:
                 "recovery_verified": False,
                 "timestamp": now_iso,
             }
-            self.history.insert(0, test_summary)
+            self._record_test(test_summary)
 
             return {
                 "test": {"id": test_id, "scenario": scenario, "status": "BLOCKED_BY_POLICY", "timestamp": now_iso},
@@ -979,10 +1019,11 @@ class ChaosTestManager:
 
         workflow_result = self.workflow.wait_for_completion(
             exec_info["execution_arn"],
-            timeout_seconds=120,
+            timeout_seconds=150,
         )
 
         recovery_result = self.recovery.verify(target_desired)
+        self._resolve_if_recovered(incident, recovery_result)
 
         self.audit.log({
             "event": "CHAOS_RECOVERY_VERIFIED",
@@ -1012,7 +1053,7 @@ class ChaosTestManager:
             "recovery_verified": recovery_result.get("recovered", False),
             "timestamp": now_iso,
         }
-        self.history.insert(0, test_summary)
+        self._record_test(test_summary)
 
         return {
             "test": {"id": test_id, "scenario": scenario, "status": "COMPLETED", "timestamp": now_iso},

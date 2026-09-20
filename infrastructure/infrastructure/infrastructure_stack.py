@@ -592,27 +592,7 @@ class InfrastructureStack(Stack):
             cause="The provided remediation action is not supported by AEGIS Step Functions."
         )
 
-        wait_retry = sfn.Wait(
-            self,
-            "WaitBeforeRetryVerification",
-            time=sfn.WaitTime.duration(Duration.seconds(10))
-        )
-
-        describe_retry = tasks.CallAwsService(
-            self,
-            "DescribeEcsServiceRetry",
-            service="ecs",
-            action="describeServices",
-            parameters={
-                "Cluster": self.cluster.cluster_name,
-                "Services": [api_service_name]
-            },
-            iam_resources=["*"],
-            result_path="$.describe_result"
-        )
-
         verify_choice = sfn.Choice(self, "VerifyEcsRecovery")
-        verify_retry_choice = sfn.Choice(self, "VerifyEcsRecoveryRetry")
         action_choice = sfn.Choice(self, "ValidateRemediationAction")
 
         scale_out_task.next(wait_for_ecs)
@@ -620,25 +600,46 @@ class InfrastructureStack(Stack):
         wait_for_ecs.next(describe_ecs)
         describe_ecs.next(verify_choice)
 
-        verify_choice.when(
-            sfn.Condition.and_(
-                sfn.Condition.number_equals_json_path("$.describe_result.Services[0].RunningCount", "$.target_desired_count"),
-                sfn.Condition.number_equals("$.describe_result.Services[0].PendingCount", 0)
-            ),
-            recovery_success
-        ).otherwise(
-            wait_retry.next(describe_retry).next(verify_retry_choice)
+        # A RESTART_TASKS ForceNewDeployment on the full 4-task API service
+        # (deregister -> pull image -> start -> pass ALB health checks)
+        # routinely takes longer than the original single 30s+10s budget, so
+        # this chains several retry rounds instead of failing after one --
+        # 30s initial wait + 4 x 20s retries = 110s total, which comfortably
+        # fits inside the 120s poll timeout callers use when waiting on this
+        # execution (chaos.py, controller.py).
+        recovery_check = sfn.Condition.and_(
+            sfn.Condition.number_equals_json_path("$.describe_result.Services[0].RunningCount", "$.target_desired_count"),
+            sfn.Condition.number_equals("$.describe_result.Services[0].PendingCount", 0)
         )
 
-        verify_retry_choice.when(
-            sfn.Condition.and_(
-                sfn.Condition.number_equals_json_path("$.describe_result.Services[0].RunningCount", "$.target_desired_count"),
-                sfn.Condition.number_equals("$.describe_result.Services[0].PendingCount", 0)
-            ),
-            recovery_success
-        ).otherwise(
-            recovery_failed
-        )
+        previous_choice = verify_choice
+        retry_wait_seconds = 20
+        max_retries = 4
+        for i in range(1, max_retries + 1):
+            wait_retry = sfn.Wait(
+                self,
+                f"WaitBeforeRetryVerification{i}",
+                time=sfn.WaitTime.duration(Duration.seconds(retry_wait_seconds))
+            )
+            describe_retry = tasks.CallAwsService(
+                self,
+                f"DescribeEcsServiceRetry{i}",
+                service="ecs",
+                action="describeServices",
+                parameters={
+                    "Cluster": self.cluster.cluster_name,
+                    "Services": [api_service_name]
+                },
+                iam_resources=["*"],
+                result_path="$.describe_result"
+            )
+            verify_retry_choice = sfn.Choice(self, f"VerifyEcsRecoveryRetry{i}")
+            previous_choice.when(recovery_check, recovery_success).otherwise(
+                wait_retry.next(describe_retry).next(verify_retry_choice)
+            )
+            previous_choice = verify_retry_choice
+
+        previous_choice.when(recovery_check, recovery_success).otherwise(recovery_failed)
 
         action_choice.when(
             sfn.Condition.string_equals("$.action", "SCALE_OUT"),
