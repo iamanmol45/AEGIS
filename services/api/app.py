@@ -705,7 +705,13 @@ def get_system_status():
                 "desired_count": desired,
                 "running_count": running,
                 "pending_count": pending,
-                "healthy": running == desired and pending == 0,
+                # >= rather than == : a rolling deployment (e.g. RESTART_TASKS'
+                # ForceNewDeployment) can briefly run more tasks than desired
+                # while old ones drain -- that's healthy and converging, not
+                # degraded. Same fix already applied to recovery.py and the
+                # Step Functions verification condition; this call site was
+                # missed until the dashboard visibly flagged it as "Degraded".
+                "healthy": running >= desired and pending == 0,
             })
     except Exception as e:
         service_info["error"] = str(e)
