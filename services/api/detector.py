@@ -197,6 +197,38 @@ class AegisDetector:
 
         return "MEDIUM"
 
+    def recheck_cleared(self, metric_name, dimensions):
+        """Re-measures a live CloudWatch metric after a remediation attempt
+        and reports whether it has actually dropped back under its
+        threshold -- a counterfactual-style check ("did intervening on this
+        service actually fix the symptom?", per CIRCA-SH's do-operator
+        framing) rather than declaring recovery purely because ECS task
+        counts converged. Only cpu/memory have a real CloudWatch series
+        backing them; other metrics return checked=False rather than
+        faking a result against data that was never real telemetry."""
+        cw_metric_name = {"cpu": "CPUUtilization", "memory": "MemoryUtilization"}.get(metric_name)
+        if cw_metric_name is None:
+            return {"checked": False, "cleared": None, "current_value": None}
+
+        try:
+            value = self.get_latest_metric(cw_metric_name, "AWS/ECS", dimensions)
+        except Exception:
+            # A CloudWatch hiccup here shouldn't crash a remediation
+            # attempt that otherwise succeeded -- fall back to "unmeasurable"
+            # the same way a missing datapoint already does, and let the
+            # caller fall back to ECS-level verification alone.
+            value = None
+        if value is None:
+            return {"checked": False, "cleared": None, "current_value": None}
+
+        threshold = self.thresholds.get(metric_name)
+        return {
+            "checked": True,
+            "cleared": value <= threshold,
+            "current_value": value,
+            "threshold": threshold,
+        }
+
     def get_latest_metric(
         self,
         metric_name,

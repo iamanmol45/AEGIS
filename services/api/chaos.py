@@ -54,6 +54,114 @@ class ChaosTestManager:
         if recovery_result.get("recovered", False):
             self.incident_manager.update_status(incident.id, "RESOLVED")
 
+    # A remediation action that didn't clear the symptom points at the
+    # other action next, rather than retrying the same one blindly:
+    # persistent high CPU/memory after SCALE_OUT suggests a stuck process
+    # (RESTART_TASKS territory), not insufficient capacity, and vice versa.
+    _ALTERNATE_ACTION = {"SCALE_OUT": "RESTART_TASKS", "RESTART_TASKS": "SCALE_OUT"}
+
+    def _self_heal_metric(self, test_id: str, incident, metric_name: str, first_action: str, current_desired: int) -> dict:
+        """
+        Closed-loop, risk-bounded self-healing for a cpu/memory chaos
+        scenario, modeled on CIRCA-SH (Ma, "Distributed Fault Root Cause
+        Localization and Self-Healing Strategy Generation Based on Causal
+        Inference", Procedia Computer Science 281, 2026): ECS task counts
+        converging only proves the ACTION completed, not that it actually
+        fixed anything. This re-measures the real CloudWatch metric that
+        triggered the incident (a counterfactual-style "did intervening
+        actually help?" check, analogous to the paper's do-operator
+        intervention test) and, if it's still breaching its threshold,
+        tries one targeted alternate action before giving up -- capped at
+        2 actions total (the paper's action budget B=2), so a persistent
+        problem escalates for human review instead of reporting false
+        success or retrying forever.
+        """
+        dims = [
+            {"Name": "ClusterName", "Value": self.remediation.cluster},
+            {"Name": "ServiceName", "Value": self.remediation.service},
+        ]
+        action = first_action
+        desired = current_desired
+        attempts = []
+        workflow_result = None
+        recovery_result = None
+        healed = False
+
+        for attempt_number in (1, 2):
+            target_desired = desired + 1 if action == "SCALE_OUT" else (desired if desired > 0 else 1)
+
+            policy_decision = self.policy.evaluate(
+                incident=incident.to_dict(),
+                action=action,
+                current_desired_count=desired,
+            )
+
+            self.audit.log({
+                "event": "SELF_HEALING_ATTEMPT",
+                "test_id": test_id,
+                "incident_id": incident.id,
+                "attempt": attempt_number,
+                "action": action,
+                "policy_allowed": policy_decision["allowed"],
+                "policy_reason": policy_decision["reason"],
+            })
+
+            if not policy_decision["allowed"]:
+                attempts.append({"action": action, "policy": policy_decision})
+                break
+
+            exec_info = self.workflow.start_recovery(
+                incident=incident.to_dict(), action=action, target_desired_count=target_desired,
+            )
+            self.policy.record_action()
+            workflow_result = self.workflow.wait_for_completion(exec_info["execution_arn"], timeout_seconds=150)
+            recovery_result = self.recovery.verify(target_desired)
+
+            symptom = self.detector.recheck_cleared(metric_name, dims)
+            ecs_recovered = recovery_result.get("recovered", False)
+            symptom_cleared = symptom.get("cleared")
+            healed = ecs_recovered and (symptom_cleared is None or symptom_cleared is True)
+
+            attempts.append({
+                "action": action, "policy": policy_decision, "execution": exec_info,
+                "workflow": workflow_result, "recovery": recovery_result,
+                "symptom": symptom, "healed": healed,
+            })
+
+            self.audit.log({
+                "event": "SELF_HEALING_VERIFIED",
+                "test_id": test_id,
+                "incident_id": incident.id,
+                "attempt": attempt_number,
+                "action": action,
+                "ecs_recovered": ecs_recovered,
+                "symptom_checked": symptom.get("checked"),
+                "symptom_cleared": symptom_cleared,
+                "current_value": symptom.get("current_value"),
+            })
+
+            if healed:
+                self._resolve_if_recovered(incident, recovery_result)
+                break
+
+            desired = target_desired
+            action = self._ALTERNATE_ACTION.get(action)
+            if attempt_number == 2 or action is None:
+                self.audit.log({
+                    "event": "SELF_HEALING_EXHAUSTED",
+                    "test_id": test_id,
+                    "incident_id": incident.id,
+                    "actions_taken": [a["action"] for a in attempts],
+                    "reason": "Action budget exhausted; underlying metric still anomalous. Escalating for human review.",
+                })
+
+        return {
+            "healed": healed,
+            "attempts": attempts,
+            "final_workflow": workflow_result,
+            "final_recovery": recovery_result,
+        }
+
     def _archive_evidence(self, incident, evidence: dict):
         """Uploads raw evidence to S3 and stamps the reference into the
         incident's metadata -- mirrors controller.py's helper, so chaos
@@ -243,7 +351,11 @@ class ChaosTestManager:
                 "recovery": None,
             }
 
-        # 6. Step Functions Remediation
+        # 6. Self-healing remediation: bounded, symptom-verifying closed
+        # loop (ยง _self_heal_metric) instead of one SCALE_OUT declared
+        # successful the moment ECS's task count matches -- re-measures the
+        # real CPU metric and escalates to RESTART_TASKS if scaling out
+        # didn't actually bring it back under threshold.
         self.audit.log({
             "event": "CHAOS_REMEDIATION_EXECUTED",
             "test_id": test_id,
@@ -252,49 +364,33 @@ class ChaosTestManager:
             "target_desired_count": target_desired,
         })
 
-        exec_info = self.workflow.start_recovery(
-            incident=incident.to_dict(),
-            action=action,
-            target_desired_count=target_desired,
+        healing_result = self._self_heal_metric(
+            test_id=test_id,
+            incident=incident,
+            metric_name=metric_name,
+            first_action=action,
+            current_desired=current_desired,
         )
 
-        self.policy.record_action()
-
-        workflow_result = self.workflow.wait_for_completion(
-            exec_info["execution_arn"],
-            timeout_seconds=150,
-        )
-
-        # 7. Recovery Verification
-        recovery_result = self.recovery.verify(target_desired)
-        self._resolve_if_recovered(incident, recovery_result)
-
-        self.audit.log({
-            "event": "CHAOS_RECOVERY_VERIFIED",
-            "test_id": test_id,
-            "incident_id": incident.id,
-            "action": action,
-            "recovery_verified": recovery_result.get("recovered", False),
-            "desired_count": recovery_result.get("desired_count"),
-            "running_count": recovery_result.get("running_count"),
-        })
+        final_workflow = healing_result["final_workflow"] or {}
+        final_recovery = healing_result["final_recovery"] or {}
 
         self.audit.log({
             "event": "CHAOS_TEST_COMPLETED",
             "test_id": test_id,
             "scenario": scenario,
             "incident_id": incident.id,
-            "action": action,
+            "actions_taken": [a["action"] for a in healing_result["attempts"]],
             "policy_allowed": True,
-            "workflow_status": workflow_result.get("workflow_status", "EXECUTED"),
-            "recovery_verified": recovery_result.get("recovered", False),
+            "workflow_status": final_workflow.get("workflow_status", "EXECUTED"),
+            "healed": healing_result["healed"],
         })
 
         test_summary = {
             "test_id": test_id,
             "scenario": scenario,
-            "status": "PASSED" if recovery_result.get("recovered", False) else "FAILED",
-            "recovery_verified": recovery_result.get("recovered", False),
+            "status": "PASSED" if healing_result["healed"] else "FAILED",
+            "recovery_verified": healing_result["healed"],
             "timestamp": now_iso,
         }
         self._record_test(test_summary)
@@ -303,10 +399,9 @@ class ChaosTestManager:
             "test": {"id": test_id, "scenario": scenario, "status": "COMPLETED", "timestamp": now_iso},
             "incident": incident.to_dict(),
             "policy": policy_decision,
-            "remediation": {"action": action, "target_desired_count": target_desired, "status": "EXECUTED"},
-            "execution": exec_info,
-            "workflow": workflow_result,
-            "recovery": recovery_result,
+            "self_healing": healing_result,
+            "workflow": final_workflow,
+            "recovery": final_recovery,
         }
 
     def run_task_failure(self, dry_run: bool = False) -> Dict[str, Any]:
@@ -599,6 +694,11 @@ class ChaosTestManager:
                 "recovery": None,
             }
 
+        # Self-healing remediation: bounded, symptom-verifying closed loop
+        # (ง _self_heal_metric) instead of one SCALE_OUT declared
+        # successful the moment ECS's task count matches -- re-measures the
+        # real memory metric and escalates to RESTART_TASKS if scaling out
+        # didn't actually bring it back under threshold (e.g. a real leak).
         self.audit.log({
             "event": "CHAOS_REMEDIATION_EXECUTED",
             "test_id": test_id,
@@ -607,46 +707,33 @@ class ChaosTestManager:
             "target_desired_count": target_desired,
         })
 
-        exec_info = self.workflow.start_recovery(
-            incident=incident.to_dict(),
-            action=action,
-            target_desired_count=target_desired,
+        healing_result = self._self_heal_metric(
+            test_id=test_id,
+            incident=incident,
+            metric_name=metric_name,
+            first_action=action,
+            current_desired=current_desired,
         )
 
-        self.policy.record_action()
-
-        workflow_result = self.workflow.wait_for_completion(
-            exec_info["execution_arn"],
-            timeout_seconds=150,
-        )
-
-        recovery_result = self.recovery.verify(target_desired)
-        self._resolve_if_recovered(incident, recovery_result)
-
-        self.audit.log({
-            "event": "CHAOS_RECOVERY_VERIFIED",
-            "test_id": test_id,
-            "incident_id": incident.id,
-            "action": action,
-            "recovery_verified": recovery_result.get("recovered", False),
-        })
+        final_workflow = healing_result["final_workflow"] or {}
+        final_recovery = healing_result["final_recovery"] or {}
 
         self.audit.log({
             "event": "CHAOS_TEST_COMPLETED",
             "test_id": test_id,
             "scenario": scenario,
             "incident_id": incident.id,
-            "action": action,
+            "actions_taken": [a["action"] for a in healing_result["attempts"]],
             "policy_allowed": True,
-            "workflow_status": workflow_result.get("workflow_status", "EXECUTED"),
-            "recovery_verified": recovery_result.get("recovered", False),
+            "workflow_status": final_workflow.get("workflow_status", "EXECUTED"),
+            "healed": healing_result["healed"],
         })
 
         test_summary = {
             "test_id": test_id,
             "scenario": scenario,
-            "status": "PASSED" if recovery_result.get("recovered", False) else "FAILED",
-            "recovery_verified": recovery_result.get("recovered", False),
+            "status": "PASSED" if healing_result["healed"] else "FAILED",
+            "recovery_verified": healing_result["healed"],
             "timestamp": now_iso,
         }
         self._record_test(test_summary)
@@ -655,10 +742,9 @@ class ChaosTestManager:
             "test": {"id": test_id, "scenario": scenario, "status": "COMPLETED", "timestamp": now_iso},
             "incident": incident.to_dict(),
             "policy": policy_decision,
-            "remediation": {"action": action, "target_desired_count": target_desired, "status": "EXECUTED"},
-            "execution": exec_info,
-            "workflow": workflow_result,
-            "recovery": recovery_result,
+            "self_healing": healing_result,
+            "workflow": final_workflow,
+            "recovery": final_recovery,
         }
 
     def run_multi_signal(self, dry_run: bool = False) -> Dict[str, Any]:

@@ -39,6 +39,107 @@ class AegisController:
         if workflow_result.get("recovery_verified", False):
             self.incident_manager.update_status(incident.id, "RESOLVED")
 
+    # A remediation action that didn't clear the symptom points at the
+    # other action next, rather than retrying the same one blindly:
+    # persistent high CPU/memory after SCALE_OUT suggests a stuck process
+    # (RESTART_TASKS territory), not insufficient capacity, and vice versa.
+    _ALTERNATE_ACTION = {"SCALE_OUT": "RESTART_TASKS", "RESTART_TASKS": "SCALE_OUT"}
+
+    def _self_heal_metric(self, incident, metric_name: str, first_action: str, current_desired: int, confidence: float) -> dict:
+        """
+        Closed-loop, risk-bounded self-healing for a single cpu/memory
+        anomaly, modeled on CIRCA-SH (Ma, "Distributed Fault Root Cause
+        Localization and Self-Healing Strategy Generation Based on Causal
+        Inference", Procedia Computer Science 281, 2026): don't declare an
+        incident healed just because ECS's task count converged -- that
+        only proves the ACTION completed, not that it fixed anything.
+        Re-measure the real CloudWatch metric that triggered the incident
+        (a counterfactual-style "did intervening actually help?" check,
+        analogous to the paper's do-operator intervention test) and, if it's
+        still breaching its threshold, try one targeted alternate action
+        before giving up -- capped at 2 actions total (the paper's action
+        budget B=2), so a stuck problem escalates for human review instead
+        of retrying forever or reporting false success.
+        """
+        dims = [
+            {"Name": "ClusterName", "Value": self.remediation.cluster},
+            {"Name": "ServiceName", "Value": self.remediation.service},
+        ]
+        action = first_action
+        desired = current_desired
+        attempts = []
+        workflow_result = None
+        healed = False
+
+        for attempt_number in (1, 2):
+            target_desired = desired + 1 if action == "SCALE_OUT" else (desired if desired > 0 else 1)
+
+            policy_decision = self.policy.evaluate(
+                incident=incident.to_dict(),
+                action=action,
+                current_desired_count=desired,
+                confidence=confidence,
+            )
+
+            self.audit.log({
+                "event": "SELF_HEALING_ATTEMPT",
+                "incident_id": incident.id,
+                "attempt": attempt_number,
+                "action": action,
+                "policy_allowed": policy_decision["allowed"],
+                "policy_reason": policy_decision["reason"],
+            })
+
+            if not policy_decision["allowed"]:
+                attempts.append({"action": action, "policy": policy_decision, "workflow": None, "symptom": None})
+                break
+
+            exec_info = self.workflow.start_recovery(
+                incident=incident.to_dict(), action=action, target_desired_count=target_desired,
+            )
+            self.policy.record_action()
+            workflow_result = self.workflow.wait_for_completion(exec_info["execution_arn"], timeout_seconds=150)
+
+            symptom = self.detector.recheck_cleared(metric_name, dims)
+            ecs_recovered = workflow_result.get("recovery_verified", False)
+            # If the metric can't be measured right now (no CloudWatch data
+            # yet), fall back to ECS-level verification alone rather than
+            # blocking forever on an unmeasurable symptom.
+            symptom_cleared = symptom.get("cleared")
+            healed = ecs_recovered and (symptom_cleared is None or symptom_cleared is True)
+
+            attempts.append({
+                "action": action, "policy": policy_decision,
+                "workflow": workflow_result, "symptom": symptom, "healed": healed,
+            })
+
+            self.audit.log({
+                "event": "SELF_HEALING_VERIFIED",
+                "incident_id": incident.id,
+                "attempt": attempt_number,
+                "action": action,
+                "ecs_recovered": ecs_recovered,
+                "symptom_checked": symptom.get("checked"),
+                "symptom_cleared": symptom_cleared,
+                "current_value": symptom.get("current_value"),
+            })
+
+            if healed:
+                self.incident_manager.update_status(incident.id, "RESOLVED")
+                break
+
+            desired = target_desired
+            action = self._ALTERNATE_ACTION.get(action)
+            if attempt_number == 2 or action is None:
+                self.audit.log({
+                    "event": "SELF_HEALING_EXHAUSTED",
+                    "incident_id": incident.id,
+                    "actions_taken": [a["action"] for a in attempts],
+                    "reason": "Action budget exhausted; underlying metric still anomalous. Escalating for human review.",
+                })
+
+        return {"healed": healed, "attempts": attempts, "final_workflow": workflow_result}
+
     def _archive_evidence(self, incident, evidence: dict):
         """Uploads raw evidence to S3 and stamps the reference into the
         incident's metadata so DynamoDB stays lean but the full context
@@ -326,7 +427,6 @@ class AegisController:
             confidence = rca_result.get("confidence", 1.0)
             self._archive_evidence(incident, {"detection": detection, "rca": rca_result})
 
-            target_desired = desired + 1
             policy_decision = self.policy.evaluate(
                 incident=incident.to_dict(),
                 action="SCALE_OUT",
@@ -359,20 +459,12 @@ class AegisController:
                     "status": "BLOCKED_BY_POLICY",
                 }
 
-            exec_info = self.workflow.start_recovery(
-                incident=incident.to_dict(),
-                action="SCALE_OUT",
-                target_desired_count=target_desired
-            )
-
-            self.policy.record_action()
-
-            workflow_result = self.workflow.wait_for_completion(
-                exec_info["execution_arn"],
-                timeout_seconds=150
-            )
-            self._resolve_if_recovered(incident, workflow_result)
-
+            # Policy cleared the first action -- hand off to the bounded,
+            # symptom-verifying self-healing loop rather than firing one
+            # SCALE_OUT and declaring victory the moment ECS's task count
+            # matches: this re-measures the real cpu/memory metric that
+            # triggered the incident and escalates to RESTART_TASKS if
+            # scaling out didn't actually bring it back under threshold.
             self.audit.log({
                 "event": "STEP_FUNCTION_RECOVERY",
                 "incident_id": incident.id,
@@ -382,19 +474,24 @@ class AegisController:
                 "value": incident.value,
                 "policy_allowed": True,
                 "policy_reason": policy_decision["reason"],
-                "execution_arn": exec_info["execution_arn"],
-                "workflow_status": workflow_result.get("workflow_status", "EXECUTED"),
-                "recovery_verified": workflow_result.get("recovery_verified", False),
                 "confidence": confidence,
             })
+
+            healing_result = self._self_heal_metric(
+                incident=incident,
+                metric_name=incident.metric,
+                first_action="SCALE_OUT",
+                current_desired=desired,
+                confidence=confidence,
+            )
 
             return {
                 "anomaly": True,
                 "correlated": False,
                 "incident": incident,
                 "policy": policy_decision,
-                "execution": exec_info,
-                "workflow": workflow_result,
+                "self_healing": healing_result,
+                "workflow": healing_result.get("final_workflow"),
             }
 
         return {

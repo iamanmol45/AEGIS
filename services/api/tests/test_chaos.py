@@ -73,8 +73,9 @@ def test_cpu_spike_generates_anomaly_and_full_chain(mock_chaos_setup):
     assert res["incident"]["value"] == 95.0
     assert res["incident"]["severity"] == "CRITICAL"
     assert res["policy"]["allowed"] is True
-    assert res["remediation"]["action"] == "SCALE_OUT"
-    assert res["remediation"]["target_desired_count"] == 2
+    assert res["self_healing"]["healed"] is True
+    assert res["self_healing"]["attempts"][0]["action"] == "SCALE_OUT"
+    assert res["self_healing"]["attempts"][0]["recovery"]["desired_count"] == 2
     mock_chaos_setup["workflow"].start_recovery.assert_called_once()
     assert res["recovery"]["recovered"] is True
 
@@ -99,7 +100,8 @@ def test_memory_pressure_generates_anomaly(mock_chaos_setup):
     assert res["test"]["scenario"] == "MEMORY_PRESSURE"
     assert res["incident"]["metric"] == "memory"
     assert res["incident"]["severity"] == "CRITICAL"
-    assert res["remediation"]["action"] == "SCALE_OUT"
+    assert res["self_healing"]["healed"] is True
+    assert res["self_healing"]["attempts"][0]["action"] == "SCALE_OUT"
 
 
 def test_multi_signal_scenario_contains_all_expected_signals(mock_chaos_setup):
@@ -169,7 +171,7 @@ def test_chaos_test_generates_audit_events(mock_chaos_setup):
     assert "CHAOS_INCIDENT_DETECTED" in events
     assert "CHAOS_POLICY_EVALUATED" in events
     assert "CHAOS_REMEDIATION_EXECUTED" in events
-    assert "CHAOS_RECOVERY_VERIFIED" in events
+    assert "SELF_HEALING_VERIFIED" in events
     assert "CHAOS_TEST_COMPLETED" in events
 
 

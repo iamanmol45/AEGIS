@@ -56,7 +56,11 @@ class RecoveryVerifier:
             "pending_count": service["pendingCount"],
             "recovered": (
                 service["desiredCount"] == expected_count
-                and service["runningCount"] == expected_count
+                # >= rather than == : a RESTART_TASKS ForceNewDeployment lets
+                # ECS run new tasks alongside old ones before draining them,
+                # so runningCount can briefly overshoot desiredCount during a
+                # healthy rollout -- treating that as a failure was the bug.
+                and service["runningCount"] >= expected_count
                 and service["pendingCount"] == 0
             )
         }

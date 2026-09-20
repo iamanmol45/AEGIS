@@ -1942,7 +1942,7 @@
         var dryRun = document.getElementById("dryRunChk").checked;
         // Backend waits up to 120s for Step Functions recovery + verification when
         // a scenario isn't blocked by policy, so the client timeout must exceed that.
-        fetchJSON("/chaos/" + slug + "?dry_run=" + dryRun, { method: "POST" }, 170000).then(function (res) {
+        fetchJSON("/chaos/" + slug + "?dry_run=" + dryRun, { method: "POST" }, 210000).then(function (res) {
           var outcome = res.status || (res.test && res.test.status) || "Done";
           tag.textContent = outcome;
           document.getElementById("chaosFoot").textContent = slug + ": " + outcome + ". History and incidents refreshed below.";

@@ -324,6 +324,13 @@ class InfrastructureStack(Stack):
             "AegisAlb",
             vpc=self.vpc,
             internet_facing=True,
+            # Chaos endpoints run synchronously through Step Functions
+            # (wait_for_completion, timeout_seconds=150) when a scenario
+            # isn't blocked by policy. The default 60s idle timeout kills
+            # that connection mid-request even though the backend keeps
+            # working and finishes successfully -- 200s covers the worst
+            # case with headroom.
+            idle_timeout=Duration.seconds(200),
         )
 
         # -------------------------
@@ -607,8 +614,12 @@ class InfrastructureStack(Stack):
         # 30s initial wait + 4 x 20s retries = 110s total, which comfortably
         # fits inside the 120s poll timeout callers use when waiting on this
         # execution (chaos.py, controller.py).
+        # >= rather than == on RunningCount: a RESTART_TASKS ForceNewDeployment
+        # lets ECS run new tasks alongside old ones before draining them, so
+        # RunningCount can briefly overshoot the target during a healthy
+        # rollout -- treating that as "not recovered" was the bug.
         recovery_check = sfn.Condition.and_(
-            sfn.Condition.number_equals_json_path("$.describe_result.Services[0].RunningCount", "$.target_desired_count"),
+            sfn.Condition.number_greater_than_equals_json_path("$.describe_result.Services[0].RunningCount", "$.target_desired_count"),
             sfn.Condition.number_equals("$.describe_result.Services[0].PendingCount", 0)
         )
 
