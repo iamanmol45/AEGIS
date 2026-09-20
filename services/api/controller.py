@@ -7,6 +7,8 @@ from audit import AuditLogger
 from policy import RemediationPolicy
 from workflow import StepFunctionsWorkflowManager
 from correlation import IncidentCorrelationEngine
+from evidence import EvidenceStore
+from rca import RCAEngine
 
 
 class AegisController:
@@ -26,6 +28,19 @@ class AegisController:
         self.audit = AuditLogger()
         self.workflow = workflow or StepFunctionsWorkflowManager()
         self.correlation_engine = correlation_engine or IncidentCorrelationEngine(window_seconds=60)
+        self.evidence = EvidenceStore()
+        self.rca_engine = RCAEngine(store=self.incident_manager.store)
+
+    def _archive_evidence(self, incident, evidence: dict):
+        """Uploads raw evidence to S3 and stamps the reference into the
+        incident's metadata so DynamoDB stays lean but the full context
+        (signals, detection payload) stays auditable."""
+        key = self.evidence.put_evidence(incident.id, evidence)
+        if not key:
+            return
+        incident.metadata["evidence_s3_key"] = key
+        self.incident_manager.store.update_incident(incident.id, {"metadata": incident.metadata})
+        return key
 
     def run(self):
         """
@@ -108,6 +123,13 @@ class AegisController:
         if correlated is not None:
             # Create ONE unified incident from correlated signals
             incident = self.incident_manager.create_correlated_incident(correlated)
+            rca_result = self.rca_engine.analyze(incident.to_dict())
+            confidence = rca_result.get("confidence", 1.0)
+            evidence_key = self._archive_evidence(incident, {
+                "correlated": correlated,
+                "task_health": {"desired_count": desired, "running_count": running},
+                "rca": rca_result,
+            })
 
             # Audit the correlated incident creation
             self.audit.log({
@@ -117,6 +139,9 @@ class AegisController:
                 "signal_count": incident.signal_count or len(correlated.get("signals", [])),
                 "signals": [s["metric"] for s in correlated.get("signals", [])],
                 "reason": incident.reason or "Multiple correlated infrastructure signals detected",
+                "evidence_s3_key": evidence_key,
+                "root_cause": rca_result.get("root_cause"),
+                "confidence": confidence,
             })
 
             # Determine remediation action based on signal composition
@@ -132,7 +157,8 @@ class AegisController:
             policy_decision = self.policy.evaluate(
                 incident=incident.to_dict(),
                 action=action,
-                current_desired_count=desired
+                current_desired_count=desired,
+                confidence=confidence,
             )
 
             if not policy_decision["allowed"]:
@@ -207,11 +233,18 @@ class AegisController:
                 threshold=desired,
                 severity="CRITICAL",
             )
+            rca_result = self.rca_engine.analyze(incident.to_dict())
+            confidence = rca_result.get("confidence", 1.0)
+            self._archive_evidence(incident, {
+                "task_health": {"desired_count": desired, "running_count": running},
+                "rca": rca_result,
+            })
 
             policy_decision = self.policy.evaluate(
                 incident=incident.to_dict(),
                 action="RESTART_TASKS",
-                current_desired_count=desired
+                current_desired_count=desired,
+                confidence=confidence,
             )
 
             if not policy_decision["allowed"]:
@@ -225,6 +258,7 @@ class AegisController:
                     "execution_arn": None,
                     "workflow_status": "BLOCKED_BY_POLICY",
                     "recovery_verified": False,
+                    "confidence": confidence,
                 })
 
                 return {
@@ -259,6 +293,7 @@ class AegisController:
                 "execution_arn": exec_info["execution_arn"],
                 "workflow_status": workflow_result.get("workflow_status", "EXECUTED"),
                 "recovery_verified": workflow_result.get("recovery_verified", False),
+                "confidence": confidence,
             })
 
             return {
@@ -277,12 +312,16 @@ class AegisController:
                 threshold=detection["threshold"],
                 severity=detection["severity"],
             )
+            rca_result = self.rca_engine.analyze(incident.to_dict())
+            confidence = rca_result.get("confidence", 1.0)
+            self._archive_evidence(incident, {"detection": detection, "rca": rca_result})
 
             target_desired = desired + 1
             policy_decision = self.policy.evaluate(
                 incident=incident.to_dict(),
                 action="SCALE_OUT",
-                current_desired_count=desired
+                current_desired_count=desired,
+                confidence=confidence,
             )
 
             if not policy_decision["allowed"]:
@@ -298,6 +337,7 @@ class AegisController:
                     "execution_arn": None,
                     "workflow_status": "BLOCKED_BY_POLICY",
                     "recovery_verified": False,
+                    "confidence": confidence,
                 })
 
                 return {
@@ -334,6 +374,7 @@ class AegisController:
                 "execution_arn": exec_info["execution_arn"],
                 "workflow_status": workflow_result.get("workflow_status", "EXECUTED"),
                 "recovery_verified": workflow_result.get("recovery_verified", False),
+                "confidence": confidence,
             })
 
             return {

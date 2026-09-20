@@ -16,6 +16,7 @@ from controller import AegisController
 from workflow import StepFunctionsWorkflowManager
 from correlation import IncidentCorrelationEngine
 from chaos import ChaosTestManager
+from evidence import EvidenceStore
 
 app = FastAPI(
     title="AEGIS Autonomous Cloud Infrastructure",
@@ -32,6 +33,7 @@ rca_engine = RCAEngine()
 ai_reasoning_engine = AIReasoningEngine()
 audit_logger = AuditLogger()
 correlation_engine = IncidentCorrelationEngine(window_seconds=60)
+evidence_store = EvidenceStore()
 aegis_controller = AegisController(
     policy=policy,
     workflow=workflow_manager,
@@ -164,6 +166,42 @@ def chaos_multi_signal(dry_run: bool = Query(default=False)):
     return chaos_manager.run_multi_signal(dry_run=dry_run)
 
 
+@app.post("/chaos/latency-spike")
+def chaos_latency_spike(dry_run: bool = Query(default=False)):
+    """Simulate a controlled API latency spike."""
+    return chaos_manager.run_latency_spike(dry_run=dry_run)
+
+
+@app.post("/chaos/error-rate-spike")
+def chaos_error_rate_spike(dry_run: bool = Query(default=False)):
+    """Simulate a controlled HTTP 5xx error rate spike."""
+    return chaos_manager.run_error_rate_spike(dry_run=dry_run)
+
+
+@app.post("/chaos/db-connectivity-failure")
+def chaos_db_connectivity_failure(dry_run: bool = Query(default=False)):
+    """Simulate a controlled RDS connectivity failure (expected to escalate, not auto-remediate)."""
+    return chaos_manager.run_db_connectivity_failure(dry_run=dry_run)
+
+
+@app.post("/chaos/bad-deployment")
+def chaos_bad_deployment(dry_run: bool = Query(default=False)):
+    """Simulate a controlled bad-deployment error spike."""
+    return chaos_manager.run_bad_deployment(dry_run=dry_run)
+
+
+@app.post("/chaos/low-confidence")
+def chaos_low_confidence(dry_run: bool = Query(default=False)):
+    """Simulate a detected anomaly with no established RCA pattern (expected to escalate on low confidence)."""
+    return chaos_manager.run_low_confidence_incident(dry_run=dry_run)
+
+
+@app.post("/chaos/normal-workload")
+def chaos_normal_workload(dry_run: bool = Query(default=False)):
+    """Simulate healthy metrics -- confirms no false-positive incident is raised."""
+    return chaos_manager.run_normal_workload(dry_run=dry_run)
+
+
 @app.get("/chaos/history")
 def get_chaos_history():
     """Return recent chaos experiments."""
@@ -236,6 +274,19 @@ def scan():
     }
 
 
+@app.post("/cycle")
+def run_cycle():
+    """
+    Runs one full detect -> correlate -> policy -> recover -> verify cycle
+    synchronously (same call supervisor.py's poll loop makes). Intended as
+    the target for the EventBridge -> SQS -> Lambda alarm-triggered path,
+    so a real anomaly gets a near-immediate cycle instead of waiting for
+    the next fixed poll interval; the poller keeps running independently
+    as a fallback in case an alarm-driven trigger is missed.
+    """
+    return aegis_controller.run()
+
+
 @app.post("/incident")
 def create_incident(metric: MetricInput):
     result = detector.check_metric(
@@ -276,6 +327,23 @@ def get_incident(incident_id: str):
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
+
+
+@app.get("/incidents/{incident_id}/evidence")
+def get_incident_evidence(incident_id: str):
+    incident = incident_manager.get_by_id(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    evidence_key = (incident.metadata or {}).get("evidence_s3_key")
+    if not evidence_key:
+        raise HTTPException(status_code=404, detail="No archived evidence for this incident")
+
+    evidence = evidence_store.get_evidence(evidence_key)
+    if evidence is None:
+        raise HTTPException(status_code=502, detail="Evidence archived but could not be retrieved from S3")
+
+    return {"incident_id": incident_id, "evidence_s3_key": evidence_key, "evidence": evidence}
 
 
 @app.post("/rca")

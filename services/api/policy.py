@@ -4,7 +4,7 @@ from datetime import datetime
 
 class RemediationPolicy:
 
-    def __init__(self, max_desired_count=4, cooldown_seconds=120, critical_only=True):
+    def __init__(self, max_desired_count=4, cooldown_seconds=120, critical_only=True, min_confidence=0.6):
         self.max_desired_count = max_desired_count
         self.cooldown_seconds = cooldown_seconds
         self.allowed_actions = [
@@ -12,9 +12,10 @@ class RemediationPolicy:
             "RESTART_TASKS"
         ]
         self.critical_only = critical_only
+        self.min_confidence = min_confidence
         self.last_action_time = None
 
-    def evaluate(self, incident, action, current_desired_count):
+    def evaluate(self, incident, action, current_desired_count, confidence: float = 1.0):
         # 1. Validate incident data
         if not incident or not isinstance(incident, dict):
             return {
@@ -48,6 +49,19 @@ class RemediationPolicy:
                 "allowed": False,
                 "action": action,
                 "reason": f"Action '{action}' is not in allowed actions list {self.allowed_actions}"
+            }
+
+        # 3b. Check RCA Confidence (spec FR-07/FR-11: escalate low-confidence
+        # diagnoses instead of auto-remediating on a guess)
+        if confidence < self.min_confidence:
+            return {
+                "allowed": False,
+                "action": action,
+                "reason": (
+                    f"RCA confidence {confidence:.2f} is below the minimum "
+                    f"{self.min_confidence:.2f} required for autonomous execution; "
+                    "escalating for human review."
+                )
             }
 
         # 4. Check Maximum Desired Task Count for SCALE_OUT
@@ -85,4 +99,5 @@ class RemediationPolicy:
             "cooldown_seconds": self.cooldown_seconds,
             "allowed_actions": self.allowed_actions,
             "critical_only": self.critical_only,
+            "min_confidence": self.min_confidence,
         }

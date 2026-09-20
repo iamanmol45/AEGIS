@@ -2,73 +2,29 @@ from datetime import datetime
 
 
 class AIReasoningEngine:
+    """
+    Produces a human-readable narrative from RCAEngine's structured
+    output. Kept as its own pipeline stage (matching the spec's "Bedrock
+    Reasoning" step) so it can be swapped for an actual Bedrock call later
+    -- once account-level model access is approved -- without touching
+    RCAEngine, policy.py, or controller.py.
+    """
 
     def analyze(self, incident: dict, rca: dict):
-
-        metric = incident.get("metric", "unknown")
-        value = incident.get("value", 0)
-        threshold = incident.get("threshold", 0)
-        severity = incident.get("severity", "MEDIUM")
-        service = incident.get("service", "aegis-api")
-
-        if metric == "cpu":
-            impact = (
-                "The service may experience increased latency, "
-                "reduced throughput, or request failures."
-            )
-
-            if value >= 90:
-                likely_cause = (
-                    "The ECS task is experiencing unusually high "
-                    "CPU consumption, potentially due to a "
-                    "CPU-intensive workload."
-                )
-            else:
-                likely_cause = (
-                    "CPU utilization has exceeded the configured "
-                    "operational threshold."
-                )
-
-        elif metric == "memory":
-            impact = (
-                "The service may experience degraded performance "
-                "or container instability."
-            )
-
-            if value >= 90:
-                likely_cause = (
-                    "The ECS task is consuming unusually high "
-                    "memory, potentially due to a memory-intensive workload."
-                )
-            else:
-                likely_cause = (
-                    "Memory utilization has exceeded the configured threshold."
-                )
-
-        else:
-            impact = "The affected service may experience degraded performance."
-            likely_cause = f"An abnormal {metric} measurement was detected."
-
-        recommendation = rca.get(
-            "recommendation",
-            "Investigate the affected service and metric.",
-        )
+        severity = incident.get("severity", rca.get("severity", "MEDIUM"))
+        metric = incident.get("metric", rca.get("evidence", {}).get("metric", "unknown"))
+        service = incident.get("service", "aegis-api-service")
+        confidence = rca.get("confidence", 0.5)
 
         return {
             "timestamp": datetime.utcnow().isoformat(),
-            "incident_id": incident.get("id", "UNKNOWN"),
+            "incident_id": incident.get("id", rca.get("incident_id", "UNKNOWN")),
             "analysis": {
-                "summary": (
-                    f"{severity} {metric} anomaly detected in "
-                    f"{service}."
-                ),
-                "likely_cause": likely_cause,
-                "impact": impact,
-                "evidence": {
-                    "metric": metric,
-                    "observed_value": value,
-                    "threshold": threshold,
-                },
-                "recommended_action": recommendation,
+                "summary": f"{severity} {metric} anomaly detected in {service} (confidence: {confidence:.0%}).",
+                "likely_cause": rca.get("root_cause", "Unknown"),
+                "impact": rca.get("impact", "Impact not assessed."),
+                "confidence": confidence,
+                "evidence": rca.get("evidence", {}),
+                "recommended_action": rca.get("recommendation", "Investigate the affected service and metric."),
             },
         }

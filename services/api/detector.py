@@ -12,6 +12,14 @@ class AegisDetector:
             "cpu": 80.0,
             "memory": 80.0,
             "running_tasks": 1,
+            "latency_ms": 1000.0,
+            "http_5xx_rate": 5.0,
+            "db_connection_errors": 5.0,
+            # Deliberately absent from rca.py's METRIC_KNOWLEDGE -- lets
+            # this metric register as a real anomaly here while RCA still
+            # treats it as a novel/unrecognized pattern (low confidence),
+            # for the LOW_CONFIDENCE_INCIDENT chaos scenario.
+            "disk_io_saturation": 70.0,
         }
         self.min_samples = min_samples
         self.max_history = max_history
@@ -166,11 +174,26 @@ class AegisDetector:
         if metric_name == "running_tasks":
             return "HIGH"
 
-        if value >= 95:
-            return "CRITICAL"
+        # cpu/memory keep their original percentage-scale absolute
+        # thresholds (load-bearing for existing tests/behavior).
+        if metric_name in ("cpu", "memory"):
+            if value >= 95:
+                return "CRITICAL"
+            if value >= 80:
+                return "HIGH"
+            return "MEDIUM"
 
-        if value >= 80:
-            return "HIGH"
+        # Other metrics vary in unit/scale (ms, percent, count), so use a
+        # ratio against their configured threshold instead of an absolute
+        # cutoff tuned for a 0-100 percentage.
+        threshold = self.thresholds.get(metric_name)
+        if threshold:
+            ratio = value / threshold
+            if ratio >= 3:
+                return "CRITICAL"
+            if ratio >= 1.5:
+                return "HIGH"
+            return "MEDIUM"
 
         return "MEDIUM"
 

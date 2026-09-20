@@ -4,6 +4,7 @@ import signal
 import logging
 import threading
 from typing import Optional
+import boto3
 from controller import AegisController
 
 # Configure logging
@@ -37,6 +38,34 @@ class AegisSupervisor:
         self._stop_event = threading.Event()
         self._cycle_lock = threading.Lock()
 
+        try:
+            self._cloudwatch = boto3.client(
+                "cloudwatch",
+                region_name=os.getenv("AWS_REGION", "ap-south-1"),
+            )
+        except Exception as e:
+            logger.warning(f"CloudWatch client unavailable, heartbeat disabled: {e}")
+            self._cloudwatch = None
+
+    def _emit_heartbeat(self):
+        """Publish a heartbeat so AegisSupervisorHeartbeatAlarm can detect a
+        stalled detection loop (missing data is treated as a breach)."""
+        if self._cloudwatch is None:
+            return
+        try:
+            self._cloudwatch.put_metric_data(
+                Namespace="AEGIS/Supervisor",
+                MetricData=[
+                    {
+                        "MetricName": "HeartbeatCount",
+                        "Value": 1,
+                        "Unit": "Count",
+                    }
+                ],
+            )
+        except Exception as e:
+            logger.warning(f"Failed to emit heartbeat metric: {e}")
+
     def handle_signal(self, signum, frame):
         """Handle termination signals gracefully."""
         sig_name = signal.Signals(signum).name if hasattr(signal, "Signals") else str(signum)
@@ -54,6 +83,11 @@ class AegisSupervisor:
             except Exception as e:
                 logger.error(f"AEGIS cycle error: {e}", exc_info=True)
                 return {"anomaly": False, "error": str(e)}
+            finally:
+                # Emitted even on failure -- a crashing cycle still proves
+                # the loop is alive; a stalled/dead thread is what the
+                # watchdog alarm needs to catch.
+                self._emit_heartbeat()
 
     def start(self):
         """Start the continuous background supervisor polling loop."""

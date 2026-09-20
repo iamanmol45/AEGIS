@@ -6,7 +6,7 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py detector.py incident.py rca.py ai_reasoning.py remediation.py recovery.py audit.py controller.py policy.py workflow.py ./
+COPY *.py ./
 
 EXPOSE 8000
 
